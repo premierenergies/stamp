@@ -7,60 +7,90 @@ export const mockCustomers: Customer[] = [
     name: "TechCorp Solutions",
     industry: "Technology",
     projects: [],
+    totalBudget: 250000,
+    activeProjects: 3,
+    completedProjects: 2,
   },
   {
     id: "2",
     name: "Global Finance Inc",
     industry: "Finance",
     projects: [],
+    totalBudget: 180000,
+    activeProjects: 2,
+    completedProjects: 1,
   },
   {
     id: "3",
     name: "HealthCare Plus",
     industry: "Healthcare",
     projects: [],
+    totalBudget: 320000,
+    activeProjects: 4,
+    completedProjects: 3,
   },
   {
     id: "4",
     name: "EcoSmart Systems",
     industry: "Environmental",
     projects: [],
+    totalBudget: 150000,
+    activeProjects: 2,
+    completedProjects: 1,
   },
   {
     id: "5",
     name: "Digital Media Pro",
     industry: "Media",
     projects: [],
+    totalBudget: 200000,
+    activeProjects: 3,
+    completedProjects: 2,
   },
   {
     id: "6",
     name: "Construction Expert",
     industry: "Construction",
     projects: [],
+    totalBudget: 450000,
+    activeProjects: 5,
+    completedProjects: 3,
   },
   {
     id: "7",
     name: "Retail Solutions",
     industry: "Retail",
     projects: [],
+    totalBudget: 280000,
+    activeProjects: 4,
+    completedProjects: 2,
   },
   {
     id: "8",
     name: "Education First",
     industry: "Education",
     projects: [],
+    totalBudget: 150000,
+    activeProjects: 2,
+    completedProjects: 1,
   },
   {
     id: "9",
     name: "Travel & Tours",
     industry: "Travel",
     projects: [],
+    totalBudget: 190000,
+    activeProjects: 3,
+    completedProjects: 2,
   },
   {
     id: "10",
     name: "Manufacturing Pro",
     industry: "Manufacturing",
     projects: [],
+    totalBudget: 380000,
+    activeProjects: 4,
+    completedProjects: 3,
   },
 ];
 
@@ -75,8 +105,15 @@ export const mockProjects: Project[] = [
     endDate: "2024-06-30",
     budget: 50000,
     priority: "high",
+    progress: 65,
+    tasks: {
+      total: 12,
+      completed: 8,
+      pending: 2,
+      stuck: 2
+    }
   },
-  // Add more mock projects...
+  // ... Add more projects with similar structure
 ];
 
 export const mockTasks: Task[] = [
@@ -90,11 +127,15 @@ export const mockTasks: Task[] = [
     dueDate: "2024-03-15",
     comments: [],
     created: "2024-01-15",
+    priority: "high",
+    timeSpent: 24,
+    completedSubtasks: 3,
+    totalSubtasks: 5
   },
-  // Add more mock tasks...
+  // ... Add more tasks with similar structure
 ];
 
-// Initialize local storage with mock data
+// Initialize mock data
 export const initializeMockData = () => {
   if (!localStorage.getItem("customers")) {
     localStorage.setItem("customers", JSON.stringify(mockCustomers));
