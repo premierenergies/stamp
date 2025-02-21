@@ -7,6 +7,17 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Dashboard from "./pages/Dashboard";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
+import CreateTask from "./pages/CreateTask";
+import TaskJourney from "./pages/TaskJourney";
+import TaskResponse from "./pages/TaskResponse";
+import PrivateRoute from "./components/PrivateRoute";
+import { initializeMockData } from "./data/mockData";
+
+// Initialize mock data
+initializeMockData();
 
 const queryClient = new QueryClient();
 
@@ -19,6 +30,54 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route
+              path="/dashboard"
+              element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/projects/:customerId"
+              element={
+                <PrivateRoute>
+                  <Projects />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/project/:projectId"
+              element={
+                <PrivateRoute>
+                  <ProjectDetail />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/project/:projectId/create-task"
+              element={
+                <PrivateRoute>
+                  <CreateTask />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/task-journey"
+              element={
+                <PrivateRoute>
+                  <TaskJourney />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/task/:taskId/respond"
+              element={
+                <PrivateRoute>
+                  <TaskResponse />
+                </PrivateRoute>
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
