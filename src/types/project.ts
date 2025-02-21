@@ -1,6 +1,7 @@
 
 export type ProjectStatus = "active" | "completed" | "on-hold";
 export type TaskStatus = "pending" | "in-progress" | "completed" | "stuck" | "approved";
+export type Priority = "low" | "medium" | "high";
 
 export interface Project {
   id: string;
@@ -11,7 +12,14 @@ export interface Project {
   startDate: string;
   endDate: string;
   budget: number;
-  priority: "low" | "medium" | "high";
+  priority: Priority;
+  progress: number;
+  tasks: {
+    total: number;
+    completed: number;
+    pending: number;
+    stuck: number;
+  };
 }
 
 export interface Task {
@@ -24,6 +32,10 @@ export interface Task {
   dueDate: string;
   comments: Comment[];
   created: string;
+  priority: Priority;
+  timeSpent: number;
+  completedSubtasks: number;
+  totalSubtasks: number;
 }
 
 export interface Comment {
@@ -38,4 +50,7 @@ export interface Customer {
   name: string;
   industry: string;
   projects: Project[];
+  totalBudget: number;
+  activeProjects: number;
+  completedProjects: number;
 }
