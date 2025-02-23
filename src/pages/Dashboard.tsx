@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Eye, Plus, ArrowRight, Users, CheckCircle, AlertTriangle } from "lucide-react";
@@ -13,10 +12,48 @@ import {
   Tooltip,
   ResponsiveContainer
 } from "recharts";
+import { toast } from "react-toastify";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const createProject = (customerId: string) => {
+    const newProject: Project = {
+      id: Math.random().toString(36).substr(2, 9),
+      customerId,
+      customerName: mockCustomers.find(c => c.id === customerId)?.name || "",
+      name: "New Project",
+      description: "",
+      status: "pending",
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      budget: 0,
+      priority: "medium",
+      progress: 0,
+      tasks: {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        stuck: 0
+      },
+      inlineInspection: false,
+      technicalSpecsDoc: "",
+      qapCriteria: false,
+      qapDocument: "",
+      tenderDocument: "",
+      productType: "",
+      plant: "",
+      otherDocuments: [],
+      uploadedAt: new Date().toISOString()
+    };
+
+    const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]");
+    localStorage.setItem("projects", JSON.stringify([...existingProjects, newProject]));
+    
+    toast.success("Project created successfully!");
+    navigate(`/projects/${customerId}`);
+  };
 
   if (user?.role === "common") {
     const assignedTasks = mockTasks.filter(task => 
@@ -150,7 +187,6 @@ const Dashboard = () => {
     );
   }
 
-  // Sales and Manager see customer tiles
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -194,9 +230,7 @@ const Dashboard = () => {
               <div className="flex gap-2">
                 {user?.role === "sales" && (
                   <button
-                    onClick={() => {
-                      /* Add create project logic */
-                    }}
+                    onClick={() => createProject(customer.id)}
                     className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                   >
                     <Plus className="w-4 h-4" />

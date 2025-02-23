@@ -122,6 +122,62 @@ export const mockProjects: Project[] = [
     plant: "PEPPL",
     otherDocuments: ["/docs/other-1.pdf", "/docs/other-2.pdf"],
     uploadedAt: "2024-01-01T00:00:00Z"
+  },
+  {
+    id: "2",
+    customerId: "1",
+    customerName: "TechCorp Solutions",
+    name: "Mobile App Development",
+    description: "Native mobile application for customer engagement",
+    status: "active",
+    startDate: "2024-02-15",
+    endDate: "2024-08-15",
+    budget: 75000,
+    priority: "high",
+    progress: 35,
+    tasks: {
+      total: 15,
+      completed: 5,
+      pending: 8,
+      stuck: 2
+    },
+    inlineInspection: true,
+    technicalSpecsDoc: "/docs/tech-specs-2.pdf",
+    qapCriteria: true,
+    qapDocument: "/docs/qap-2.pdf",
+    tenderDocument: "/docs/tender-2.pdf",
+    productType: "MOBI",
+    plant: "PEPPL",
+    otherDocuments: ["/docs/other-3.pdf"],
+    uploadedAt: "2024-02-15T00:00:00Z"
+  },
+  {
+    id: "3",
+    customerId: "2",
+    customerName: "Global Finance Inc",
+    name: "Financial Dashboard",
+    description: "Real-time financial analytics dashboard",
+    status: "pending",
+    startDate: "2024-03-01",
+    endDate: "2024-09-30",
+    budget: 90000,
+    priority: "medium",
+    progress: 15,
+    tasks: {
+      total: 20,
+      completed: 3,
+      pending: 15,
+      stuck: 2
+    },
+    inlineInspection: false,
+    technicalSpecsDoc: "/docs/tech-specs-3.pdf",
+    qapCriteria: true,
+    qapDocument: "/docs/qap-3.pdf",
+    tenderDocument: "/docs/tender-3.pdf",
+    productType: "DASH",
+    plant: "FIPPL",
+    otherDocuments: [],
+    uploadedAt: "2024-03-01T00:00:00Z"
   }
 ];
 
@@ -130,9 +186,9 @@ export const mockTasks: Task[] = [
     id: "1",
     projectId: "1",
     title: "Design Homepage",
-    description: "Create modern homepage design",
+    description: "Create modern homepage design with responsive layouts",
     status: "in-progress",
-    assignedUsers: ["user1"],
+    assignedUsers: ["s", "c"],
     dueDate: "2024-03-15",
     comments: [],
     created: "2024-01-15",
@@ -159,6 +215,39 @@ export const mockTasks: Task[] = [
       uploadedAt: "2024-01-01T00:00:00Z"
     },
     attachments: ["/attachments/design-1.pdf"]
+  },
+  {
+    id: "2",
+    projectId: "2",
+    title: "UI/UX Design for Mobile App",
+    description: "Design user interface and experience for the mobile application",
+    status: "pending",
+    assignedUsers: ["s"],
+    dueDate: "2024-04-01",
+    comments: [],
+    created: "2024-02-15",
+    priority: "high",
+    timeSpent: 0,
+    completedSubtasks: 0,
+    totalSubtasks: 8,
+    projectDetails: {
+      customerName: "TechCorp Solutions",
+      projectTitle: "Mobile App Development",
+      projectDescription: "Native mobile application for customer engagement",
+      deliveryDateRange: {
+        start: "2024-02-15",
+        end: "2024-08-15"
+      },
+      inlineInspection: true,
+      technicalSpecsDoc: "/docs/tech-specs-2.pdf",
+      qapCriteria: true,
+      qapDocument: "/docs/qap-2.pdf",
+      tenderDocument: "/docs/tender-2.pdf",
+      productType: "MOBI",
+      plant: "PEPPL",
+      otherDocuments: ["/docs/other-3.pdf"],
+      uploadedAt: "2024-02-15T00:00:00Z"
+    }
   }
 ];
 
@@ -173,3 +262,4 @@ export const initializeMockData = () => {
     localStorage.setItem("tasks", JSON.stringify(mockTasks));
   }
 };
+
