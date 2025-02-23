@@ -4,8 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { LogOut, ChevronLeft, LayoutDashboard, FileText } from "lucide-react";
 
 const Header = () => {
-  const { user, logout } = useAuth();
+  const auth = useAuth();
   const navigate = useNavigate();
+
+  if (!auth) return null;
+  
+  const { user, logout } = auth;
 
   return (
     <header className="bg-white border-b sticky top-0 z-50">
