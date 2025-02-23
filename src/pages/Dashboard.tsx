@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, Plus, ArrowRight, Users, CheckCircle, AlertTriangle } from "lucide-react";
 import { mockCustomers, mockTasks } from "@/data/mockData";
