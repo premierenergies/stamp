@@ -98,6 +98,7 @@ export const mockProjects: Project[] = [
   {
     id: "1",
     customerId: "1",
+    customerName: "TechCorp Solutions",
     name: "Website Redesign",
     description: "Complete website overhaul with modern design",
     status: "active",
@@ -111,9 +112,17 @@ export const mockProjects: Project[] = [
       completed: 8,
       pending: 2,
       stuck: 2
-    }
-  },
-  // ... Add more projects with similar structure
+    },
+    inlineInspection: true,
+    technicalSpecsDoc: "/docs/tech-specs-1.pdf",
+    qapCriteria: true,
+    qapDocument: "/docs/qap-1.pdf",
+    tenderDocument: "/docs/tender-1.pdf",
+    productType: "PERCE",
+    plant: "PEPPL",
+    otherDocuments: ["/docs/other-1.pdf", "/docs/other-2.pdf"],
+    uploadedAt: "2024-01-01T00:00:00Z"
+  }
 ];
 
 export const mockTasks: Task[] = [
@@ -123,19 +132,36 @@ export const mockTasks: Task[] = [
     title: "Design Homepage",
     description: "Create modern homepage design",
     status: "in-progress",
-    assignedUsers: ["c"],
+    assignedUsers: ["user1"],
     dueDate: "2024-03-15",
     comments: [],
     created: "2024-01-15",
     priority: "high",
     timeSpent: 24,
     completedSubtasks: 3,
-    totalSubtasks: 5
-  },
-  // ... Add more tasks with similar structure
+    totalSubtasks: 5,
+    projectDetails: {
+      customerName: "TechCorp Solutions",
+      projectTitle: "Website Redesign",
+      projectDescription: "Complete website overhaul with modern design",
+      deliveryDateRange: {
+        start: "2024-01-01",
+        end: "2024-06-30"
+      },
+      inlineInspection: true,
+      technicalSpecsDoc: "/docs/tech-specs-1.pdf",
+      qapCriteria: true,
+      qapDocument: "/docs/qap-1.pdf",
+      tenderDocument: "/docs/tender-1.pdf",
+      productType: "PERCE",
+      plant: "PEPPL",
+      otherDocuments: ["/docs/other-1.pdf", "/docs/other-2.pdf"],
+      uploadedAt: "2024-01-01T00:00:00Z"
+    },
+    attachments: ["/attachments/design-1.pdf"]
+  }
 ];
 
-// Initialize mock data
 export const initializeMockData = () => {
   if (!localStorage.getItem("customers")) {
     localStorage.setItem("customers", JSON.stringify(mockCustomers));
