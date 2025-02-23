@@ -16,20 +16,13 @@ const mockUsers = [
 ] as const;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-  });
-
-  useEffect(() => {
+  const [authState, setAuthState] = useState<AuthState>(() => {
     const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setAuthState({
-        user: JSON.parse(storedUser),
-        isAuthenticated: true,
-      });
-    }
-  }, []);
+    return {
+      user: storedUser ? JSON.parse(storedUser) : null,
+      isAuthenticated: !!storedUser,
+    };
+  });
 
   const login = async (username: string, password: string) => {
     const user = mockUsers.find(

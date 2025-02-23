@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -8,15 +8,20 @@ import { toast } from "sonner";
 const Index = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  // If already authenticated, redirect to dashboard
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const success = await login(username, password);
     if (success) {
       toast.success("Welcome back!");
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     } else {
       toast.error("Invalid credentials");
     }
@@ -28,8 +33,7 @@ const Index = () => {
       <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-8 gap-12">
         <div className="max-w-xl space-y-6 animate-fade-in">
           <h1 className="text-4xl md:text-6xl font-bold text-slate-900">
-            Project Management,{" "}
-            <span className="text-primary">Reimagined</span>
+            Project Management, <span className="text-primary">Reimagined</span>
           </h1>
           <p className="text-lg text-slate-600">
             Transform your workflow with our intuitive project management platform.
