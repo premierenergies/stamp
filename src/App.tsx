@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -27,60 +27,58 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/projects/:customerId"
-              element={
-                <PrivateRoute>
-                  <Projects />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/project/:projectId"
-              element={
-                <PrivateRoute>
-                  <ProjectDetail />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/project/:projectId/create-task"
-              element={
-                <PrivateRoute>
-                  <CreateTask />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/task-journey"
-              element={
-                <PrivateRoute>
-                  <TaskJourney />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/task/:taskId/respond"
-              element={
-                <PrivateRoute>
-                  <TaskResponse />
-                </PrivateRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/projects/:customerId"
+            element={
+              <PrivateRoute>
+                <Projects />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/project/:projectId"
+            element={
+              <PrivateRoute>
+                <ProjectDetail />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/project/:projectId/create-task"
+            element={
+              <PrivateRoute>
+                <CreateTask />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/task-journey"
+            element={
+              <PrivateRoute>
+                <TaskJourney />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/task/:taskId/respond"
+            element={
+              <PrivateRoute>
+                <TaskResponse />
+              </PrivateRoute>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
