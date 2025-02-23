@@ -1,4 +1,3 @@
-
 import { Customer, Project, Task } from "@/types/project";
 
 export const mockCustomers: Customer[] = [
@@ -146,7 +145,7 @@ export const mockProjects: Project[] = [
     qapCriteria: true,
     qapDocument: "/docs/qap-2.pdf",
     tenderDocument: "/docs/tender-2.pdf",
-    productType: "MOBI",
+    productType: "TOPCON M10",
     plant: "PEPPL",
     otherDocuments: ["/docs/other-3.pdf"],
     uploadedAt: "2024-02-15T00:00:00Z"
@@ -157,7 +156,7 @@ export const mockProjects: Project[] = [
     customerName: "Global Finance Inc",
     name: "Financial Dashboard",
     description: "Real-time financial analytics dashboard",
-    status: "pending",
+    status: "on-hold",
     startDate: "2024-03-01",
     endDate: "2024-09-30",
     budget: 90000,
@@ -174,8 +173,8 @@ export const mockProjects: Project[] = [
     qapCriteria: true,
     qapDocument: "/docs/qap-3.pdf",
     tenderDocument: "/docs/tender-3.pdf",
-    productType: "DASH",
-    plant: "FIPPL",
+    productType: "TOPCON G12R",
+    plant: "PEIPL",
     otherDocuments: [],
     uploadedAt: "2024-03-01T00:00:00Z"
   }
@@ -243,7 +242,7 @@ export const mockTasks: Task[] = [
       qapCriteria: true,
       qapDocument: "/docs/qap-2.pdf",
       tenderDocument: "/docs/tender-2.pdf",
-      productType: "MOBI",
+      productType: "TOPCON M10",
       plant: "PEPPL",
       otherDocuments: ["/docs/other-3.pdf"],
       uploadedAt: "2024-02-15T00:00:00Z"
@@ -262,4 +261,3 @@ export const initializeMockData = () => {
     localStorage.setItem("tasks", JSON.stringify(mockTasks));
   }
 };
-

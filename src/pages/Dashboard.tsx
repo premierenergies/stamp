@@ -2,7 +2,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Eye, Plus, ArrowRight, Users, CheckCircle, AlertTriangle } from "lucide-react";
 import { mockCustomers, mockTasks } from "@/data/mockData";
+import { Project } from "@/types/project";
 import Header from "@/components/Header";
+import { toast } from "react-toastify";
 import {
   BarChart,
   Bar,
@@ -12,7 +14,6 @@ import {
   Tooltip,
   ResponsiveContainer
 } from "recharts";
-import { toast } from "react-toastify";
 
 const Dashboard = () => {
   const { user } = useAuth();
