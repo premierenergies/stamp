@@ -18,6 +18,26 @@ import {
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
+
+  const createCustomer = () => {
+    const newCustomer = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: newCustomerName,
+      industry: "General",
+      projects: [],
+      totalBudget: 0,
+      activeProjects: 0,
+      completedProjects: 0
+    };
+
+    // Add to mockCustomers or your data storage
+    mockCustomers.push(newCustomer);
+    toast.success("Customer added successfully!");
+    setShowNewCustomerDialog(false);
+    setNewCustomerName("");
+  };
 
   const createProject = (customerId: string) => {
     const newProject: Project = {
@@ -194,15 +214,43 @@ const Dashboard = () => {
       <main className="container mx-auto p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Customers</h1>
-          <div className="flex gap-4">
-            <button className="px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 transition-colors">
-              Filter
-            </button>
-            <button className="px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 transition-colors">
-              Sort
-            </button>
-          </div>
+          <button
+            onClick={() => setShowNewCustomerDialog(true)}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Customer
+          </button>
         </div>
+
+        {showNewCustomerDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h2 className="text-xl font-semibold mb-4">Add New Customer</h2>
+              <input
+                type="text"
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                placeholder="Customer Name"
+                className="w-full px-4 py-2 border rounded-lg mb-4"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowNewCustomerDialog(false)}
+                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createCustomer}
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                >
+                  Add Customer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {mockCustomers.map((customer) => (
@@ -231,7 +279,7 @@ const Dashboard = () => {
               <div className="flex gap-2">
                 {user?.role === "sales" && (
                   <button
-                    onClick={() => createProject(customer.id)}
+                    onClick={() => navigate(`/create-project/${customer.id}`)}
                     className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
