@@ -87,4 +87,3 @@ export interface Customer {
   activeProjects: number;
   completedProjects: number;
 }
-

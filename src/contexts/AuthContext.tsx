@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { AuthState, User } from "@/types/auth";
 
@@ -9,10 +8,11 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Updated mockUsers with an "id" property
 const mockUsers = [
-  { username: "s", password: "s", role: "sales", name: "Sales Team Member" },
-  { username: "p", password: "p", role: "manager", name: "Praful" },
-  { username: "c", password: "c", role: "common", name: "Common User" },
+  { id: "1", username: "s", password: "s", role: "sales", name: "Sales Team Member" },
+  { id: "2", username: "p", password: "p", role: "manager", name: "Praful" },
+  { id: "3", username: "c", password: "c", role: "common", name: "Common User" },
 ] as const;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -31,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (user) {
       const userData: User = {
+        id: user.id,
         username: user.username,
         role: user.role as User["role"],
         name: user.name,

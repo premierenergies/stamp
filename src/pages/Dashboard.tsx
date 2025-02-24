@@ -1,8 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, Plus, ArrowRight, Users, CheckCircle, AlertTriangle } from "lucide-react";
-import { mockCustomers, mockTasks } from "@/data/mockData";
+import { mockTasks } from "@/data/mockData";
 import { Project } from "@/types/project";
 import Header from "@/components/Header";
 import { toast } from "react-toastify";
@@ -21,64 +21,20 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [newCustomerName, setNewCustomerName] = useState("");
   const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
+  const [customers, setCustomers] = useState<any[]>([]);
+  
+  // For admin/sales dashboard view
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedDocumentForTask, setSelectedDocumentForTask] = useState<any>(null);
+  const [selectedDocumentForEdit, setSelectedDocumentForEdit] = useState<any>(null);
 
-  const createCustomer = () => {
-    const newCustomer = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newCustomerName,
-      industry: "General",
-      projects: [],
-      totalBudget: 0,
-      activeProjects: 0,
-      completedProjects: 0
-    };
-
-    // Add to mockCustomers or your data storage
-    mockCustomers.push(newCustomer);
-    toast.success("Customer added successfully!");
-    setShowNewCustomerDialog(false);
-    setNewCustomerName("");
-  };
-
-  const createProject = (customerId: string) => {
-    const newProject: Project = {
-      id: Math.random().toString(36).substr(2, 9),
-      customerId,
-      customerName: mockCustomers.find(c => c.id === customerId)?.name || "",
-      name: "New Project",
-      description: "",
-      status: "pending",
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      budget: 0,
-      priority: "medium",
-      progress: 0,
-      tasks: {
-        total: 0,
-        completed: 0,
-        pending: 0,
-        stuck: 0
-      },
-      inlineInspection: false,
-      technicalSpecsDoc: "",
-      qapCriteria: false,
-      qapDocument: "",
-      tenderDocument: "",
-      productType: "",
-      plant: "",
-      otherDocuments: [],
-      uploadedAt: new Date().toISOString()
-    };
-
-    const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]");
-    localStorage.setItem("projects", JSON.stringify([...existingProjects, newProject]));
-    
-    toast.success("Project created successfully!");
-    navigate(`/projects/${customerId}`);
-  };
-
+  // For common role (task view) – we continue to use mockTasks as before
   if (user?.role === "common") {
-    const assignedTasks = mockTasks.filter(task => 
+    const assignedTasks = mockTasks.filter(task =>
       task.assignedUsers.includes(user.username)
     );
 
@@ -209,6 +165,79 @@ const Dashboard = () => {
     );
   }
 
+  // For admin and sales roles, use backend endpoints for customers
+  useEffect(() => {
+    if (user && user.role !== "common") {
+      fetchCustomers();
+    }
+  }, [user]);
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/api/customers");
+      if (!res.ok) throw new Error(`Failed to fetch customers: ${res.status}`);
+      const data = await res.json();
+      setCustomers(data);
+    } catch (error) {
+      console.error("Failed to fetch customers", error);
+    }
+  };
+
+  const createCustomer = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCustomerName, industry: "General", createdBy: user?.id }),
+      });
+      if (!res.ok) throw new Error("Failed to add customer");
+      toast.success("Customer added successfully!");
+      setShowNewCustomerDialog(false);
+      setNewCustomerName("");
+      fetchCustomers();
+    } catch (error: any) {
+      console.error("Error creating customer:", error);
+      toast.error(error.message || "Error creating customer");
+    }
+  };
+
+  const createProject = (customerId: string) => {
+    const newProject: Project = {
+      id: Math.random().toString(36).substr(2, 9),
+      customerId,
+      customerName: customers.find(c => c.id === customerId)?.name || "",
+      name: "New Project",
+      description: "",
+      status: "pending",
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      budget: 0,
+      priority: "medium",
+      progress: 0,
+      tasks: {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        stuck: 0
+      },
+      inlineInspection: false,
+      technicalSpecsDoc: "",
+      qapCriteria: false,
+      qapDocument: "",
+      tenderDocument: "",
+      productType: "",
+      plant: "",
+      otherDocuments: [],
+      uploadedAt: new Date().toISOString()
+    };
+
+    const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]");
+    localStorage.setItem("projects", JSON.stringify([...existingProjects, newProject]));
+    
+    toast.success("Project created successfully!");
+    navigate(`/projects/${customerId}`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -223,7 +252,6 @@ const Dashboard = () => {
             Add Customer
           </button>
         </div>
-
         {showNewCustomerDialog && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <div className="bg-white rounded-lg p-6 w-96">
@@ -252,9 +280,8 @@ const Dashboard = () => {
             </div>
           </div>
         )}
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockCustomers.map((customer) => (
+          {customers.map((customer) => (
             <div
               key={customer.id}
               className="bg-white rounded-xl border p-6 shadow-sm hover:shadow-md transition-shadow space-y-4"
@@ -267,12 +294,12 @@ const Dashboard = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Active Projects</p>
-                  <p className="text-lg font-semibold">{customer.activeProjects}</p>
+                  <p className="text-lg font-semibold">{customer.activeProjects || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Budget</p>
                   <p className="text-lg font-semibold">
-                    ${customer.totalBudget.toLocaleString()}
+                    ${customer.totalBudget?.toLocaleString() || 0}
                   </p>
                 </div>
               </div>

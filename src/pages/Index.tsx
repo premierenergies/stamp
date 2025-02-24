@@ -33,10 +33,10 @@ const Index = () => {
       <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-8 gap-12">
         <div className="max-w-xl space-y-6 animate-fade-in">
           <h1 className="text-4xl md:text-6xl font-bold text-slate-900">
-            Project Management, <span className="text-primary">Reimagined</span>
+            Task Management and Approval, <span className="text-primary">Reimagined</span>
           </h1>
           <p className="text-lg text-slate-600">
-            Transform your workflow with our intuitive project management platform.
+            Transform your workflow with our intuitive task management platform.
             Streamline tasks, collaborate seamlessly, and achieve more together.
           </p>
         </div>
