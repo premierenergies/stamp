@@ -1,15 +1,17 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { LogOut, ChevronLeft, LayoutDashboard, FileText } from "lucide-react";
 
 const Header = () => {
-  const auth = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  if (!auth) return null;
-  
-  const { user, logout } = auth;
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
+  if (!user) return null;
 
   return (
     <header className="bg-white border-b sticky top-0 z-50">
@@ -44,7 +46,7 @@ const Header = () => {
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">{user?.name}</span>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             >
               <LogOut className="w-4 h-4" />

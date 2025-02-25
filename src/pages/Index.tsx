@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,7 +10,6 @@ const Index = () => {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // If already authenticated, redirect to dashboard
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -29,7 +27,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
-      {/* Hero Section */}
       <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-8 gap-12">
         <div className="max-w-xl space-y-6 animate-fade-in">
           <h1 className="text-4xl md:text-6xl font-bold text-slate-900">
@@ -40,19 +37,12 @@ const Index = () => {
             Streamline tasks, collaborate seamlessly, and achieve more together.
           </p>
         </div>
-
-        {/* Login Form */}
         <div className="w-full max-w-md">
           <div className="bg-white p-8 rounded-2xl shadow-lg">
-            <h2 className="text-2xl font-semibold mb-6 text-slate-900">
-              Sign In
-            </h2>
+            <h2 className="text-2xl font-semibold mb-6 text-slate-900">Sign In</h2>
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
+                <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
                   Username
                 </label>
                 <input
@@ -65,10 +55,7 @@ const Index = () => {
                 />
               </div>
               <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
                   Password
                 </label>
                 <input

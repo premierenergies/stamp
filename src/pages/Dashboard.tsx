@@ -2,8 +2,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, Plus, ArrowRight, Users, CheckCircle, AlertTriangle } from "lucide-react";
-import { mockTasks } from "@/data/mockData";
-import { Project } from "@/types/project";
 import Header from "@/components/Header";
 import { toast } from "react-toastify";
 import {
@@ -22,27 +20,51 @@ const Dashboard = () => {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
-  
-  // For admin/sales dashboard view
   const [tasks, setTasks] = useState<any[]>([]);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [createTaskOpen, setCreateTaskOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedDocumentForTask, setSelectedDocumentForTask] = useState<any>(null);
-  const [selectedDocumentForEdit, setSelectedDocumentForEdit] = useState<any>(null);
 
-  // For common role (task view) – we continue to use mockTasks as before
+  // Fetch customers from backend for admin/sales roles
+  useEffect(() => {
+    if (user && user.role !== "common") {
+      fetchCustomers();
+    }
+  }, [user]);
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/api/customers");
+      if (!res.ok) throw new Error(`Failed to fetch customers: ${res.status}`);
+      const data = await res.json();
+      setCustomers(data);
+    } catch (error) {
+      console.error("Failed to fetch customers", error);
+    }
+  };
+
+  // For users with role "common", fetch tasks assigned to them from backend
+  useEffect(() => {
+    if (user && user.role === "common") {
+      const fetchUserTasks = async () => {
+        try {
+          const res = await fetch(`http://localhost:3000/api/tasks?userId=${user.id}`);
+          if (!res.ok) throw new Error(`Failed to fetch tasks: ${res.status}`);
+          const data = await res.json();
+          setTasks(data);
+        } catch (error) {
+          console.error("Failed to fetch tasks", error);
+          toast.error("Error fetching tasks");
+        }
+      };
+      fetchUserTasks();
+    }
+  }, [user]);
+
+  // Calculate tasks stats based on fetched tasks (for common users)
   if (user?.role === "common") {
-    const assignedTasks = mockTasks.filter(task =>
-      task.assignedUsers.includes(user.username)
-    );
-
     const tasksByStatus = {
-      completed: assignedTasks.filter(t => t.status === "completed").length,
-      inProgress: assignedTasks.filter(t => t.status === "in-progress").length,
-      pending: assignedTasks.filter(t => t.status === "pending").length,
-      stuck: assignedTasks.filter(t => t.status === "stuck").length,
+      completed: tasks.filter(t => t.status === "completed").length,
+      inProgress: tasks.filter(t => t.status === "in-progress").length,
+      pending: tasks.filter(t => t.status === "pending").length,
+      stuck: tasks.filter(t => t.status === "stuck").length,
     };
 
     const chartData = [
@@ -57,7 +79,6 @@ const Dashboard = () => {
         <Header />
         <main className="container mx-auto p-6 space-y-6">
           <h1 className="text-3xl font-bold">My Tasks</h1>
-          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl border p-6 shadow-sm">
               <div className="flex items-center gap-4">
@@ -93,7 +114,6 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-xl border p-6 shadow-sm">
             <h2 className="text-xl font-semibold mb-4">Task Status Overview</h2>
             <div className="h-64">
@@ -108,7 +128,6 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
           </div>
-
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -121,14 +140,14 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {assignedTasks.map((task) => (
+                {tasks.map((task) => (
                   <tr key={task.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{task.title}</div>
                       <div className="text-sm text-gray-500">{task.description}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      Project Name
+                      {task.projectName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {task.dueDate}
@@ -165,78 +184,7 @@ const Dashboard = () => {
     );
   }
 
-  // For admin and sales roles, use backend endpoints for customers
-  useEffect(() => {
-    if (user && user.role !== "common") {
-      fetchCustomers();
-    }
-  }, [user]);
-
-  const fetchCustomers = async () => {
-    try {
-      const res = await fetch("http://localhost:3000/api/customers");
-      if (!res.ok) throw new Error(`Failed to fetch customers: ${res.status}`);
-      const data = await res.json();
-      setCustomers(data);
-    } catch (error) {
-      console.error("Failed to fetch customers", error);
-    }
-  };
-
-  const createCustomer = async () => {
-    try {
-      const res = await fetch("http://localhost:3000/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCustomerName, industry: "General", createdBy: user?.id }),
-      });
-      if (!res.ok) throw new Error("Failed to add customer");
-      toast.success("Customer added successfully!");
-      setShowNewCustomerDialog(false);
-      setNewCustomerName("");
-      fetchCustomers();
-    } catch (error: any) {
-      console.error("Error creating customer:", error);
-      toast.error(error.message || "Error creating customer");
-    }
-  };
-
-  const createProject = (customerId: string) => {
-    const newProject: Project = {
-      id: Math.random().toString(36).substr(2, 9),
-      customerId,
-      customerName: customers.find(c => c.id === customerId)?.name || "",
-      name: "New Project",
-      description: "",
-      status: "pending",
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      budget: 0,
-      priority: "medium",
-      progress: 0,
-      tasks: {
-        total: 0,
-        completed: 0,
-        pending: 0,
-        stuck: 0
-      },
-      inlineInspection: false,
-      technicalSpecsDoc: "",
-      qapCriteria: false,
-      qapDocument: "",
-      tenderDocument: "",
-      productType: "",
-      plant: "",
-      otherDocuments: [],
-      uploadedAt: new Date().toISOString()
-    };
-
-    const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]");
-    localStorage.setItem("projects", JSON.stringify([...existingProjects, newProject]));
-    
-    toast.success("Project created successfully!");
-    navigate(`/projects/${customerId}`);
-  };
+  // For admin and sales roles, fetch tasks for all users (if needed) – implementation similar to above can be added here
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -271,7 +219,23 @@ const Dashboard = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={createCustomer}
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("http://localhost:3000/api/customers", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: newCustomerName, industry: "General", createdBy: user?.id }),
+                      });
+                      if (!res.ok) throw new Error("Failed to add customer");
+                      toast.success("Customer added successfully!");
+                      setShowNewCustomerDialog(false);
+                      setNewCustomerName("");
+                      fetchCustomers();
+                    } catch (error: any) {
+                      console.error("Error creating customer:", error);
+                      toast.error(error.message || "Error creating customer");
+                    }
+                  }}
                   className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
                 >
                   Add Customer
@@ -290,7 +254,6 @@ const Dashboard = () => {
                 <h3 className="text-xl font-semibold">{customer.name}</h3>
                 <p className="text-gray-500">{customer.industry}</p>
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Active Projects</p>
@@ -298,12 +261,9 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Budget</p>
-                  <p className="text-lg font-semibold">
-                    ${customer.totalBudget?.toLocaleString() || 0}
-                  </p>
+                  <p className="text-lg font-semibold">${customer.totalBudget?.toLocaleString() || 0}</p>
                 </div>
               </div>
-
               <div className="flex gap-2">
                 {user?.role === "sales" && (
                   <button

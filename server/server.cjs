@@ -57,11 +57,15 @@ const client = Client.initWithMiddleware({
   },
 });
 
+// Use the updated credentials
 const USERS = [
-  { id: 1, name: "Praful", email: "praful@example.com", password: "praful", role: "admin" },
-  { id: 2, name: "Sales User", email: "sales@example.com", password: "sales", role: "sales" },
-  { id: 3, name: "User 1", email: "user1@example.com", password: "password", role: "user" },
-  { id: 20, name: "nav", email: "aarnav.singh@premierenergies.com", password: "nav", role: "user" },
+  { id: 1, username: "s", password: "s", role: "sales", name: "Sales Team Member" },
+  { id: 2, username: "p", password: "p", role: "manager", name: "Praful" },
+  { id: 3, username: "a", password: "a", role: "common", name: "Common User 1" },
+  { id: 4, username: "b", password: "b", role: "common", name: "Common User 2" },
+  { id: 5, username: "c", password: "c", role: "common", name: "Common User 3" },
+  { id: 6, username: "d", password: "d", role: "common", name: "Common User 4" },
+  { id: 7, username: "e", password: "e", role: "common", name: "Common User 5" },
 ];
 
 // ----------------------
@@ -77,19 +81,22 @@ const customerSchema = new mongoose.Schema({
 });
 const Customer = mongoose.model("Customer", customerSchema);
 
-// GET single customer by ID
 app.get("/api/customers/:id", async (req, res) => {
   try {
     const customer = await Customer.findById(req.params.id);
     if (!customer) return res.status(404).json({ message: "Customer not found" });
+    const activeProjects = customer.projects.filter(p => p.status === "active").length;
+    const completedProjects = customer.projects.filter(p => p.status === "completed").length;
+    const totalBudget = customer.projects.reduce((sum, p) => sum + (p.budget || 0), 0);
     res.json({
       customer: {
         id: customer._id.toString(),
         name: customer.name,
         industry: customer.industry,
         projects: customer.projects,
-        activeProjects: customer.activeProjects,
-        completedProjects: customer.completedProjects,
+        activeProjects,
+        completedProjects,
+        totalBudget,
         createdAt: customer.createdAt,
       },
     });
@@ -99,28 +106,31 @@ app.get("/api/customers/:id", async (req, res) => {
   }
 });
 
-// GET all customers
 app.get("/api/customers", async (req, res) => {
   try {
     const customers = await Customer.find({});
-    res.json(
-      customers.map(c => ({
+    const mappedCustomers = customers.map(c => {
+      const activeProjects = c.projects.filter(p => p.status === "active").length;
+      const completedProjects = c.projects.filter(p => p.status === "completed").length;
+      const totalBudget = c.projects.reduce((sum, p) => sum + (p.budget || 0), 0);
+      return {
         id: c._id.toString(),
         name: c.name,
         industry: c.industry,
         projects: c.projects,
-        activeProjects: c.activeProjects,
-        completedProjects: c.completedProjects,
+        activeProjects,
+        completedProjects,
+        totalBudget,
         createdAt: c.createdAt,
-      }))
-    );
+      };
+    });
+    res.json(mappedCustomers);
   } catch (error) {
     console.error("Error fetching customers:", error);
     res.status(500).json({ message: "Error fetching customers" });
   }
 });
 
-// POST /api/customers – create new customer
 app.post("/api/customers", async (req, res) => {
   try {
     const { name, industry, createdBy } = req.body;
@@ -165,27 +175,27 @@ const taskResponseSchema = new mongoose.Schema({
 });
 
 // ----------------------
-// Task Schema
+// Task Schema – updated for project tasks with projectDetails field
 // ----------------------
 const taskSchema = new mongoose.Schema({
-  projectName: String,
-  documentId: String,
-  documentName: String,
-  documentUrl: String,
-  description: String,
-  assignedUsers: [String],
-  responses: [taskResponseSchema],
-  attachments: [{ name: String, url: String }],
-  status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+  projectId: { type: String, required: true },
+  projectName: { type: String, required: true },
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  status: { type: String, enum: ["pending", "in-progress", "completed", "stuck", "approved"], default: "pending" },
+  assignedUsers: { type: [String], default: [] },
+  dueDate: { type: String, required: true },
+  attachments: { type: [{ name: String, url: String }], default: [] },
   createdAt: { type: Date, default: Date.now },
   createdBy: String,
-  timeline: Date,
+  responses: { type: [taskResponseSchema], default: [] },
   isLate: { type: Boolean, default: false },
   finalSignOff: {
-    users: [String],
+    users: { type: [String], default: [] },
     comments: String,
     timestamp: Date,
   },
+  projectDetails: { type: Object, default: {} },
 });
 const Task = mongoose.model("Task", taskSchema);
 
@@ -212,7 +222,7 @@ app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   const user = USERS.find((u) => u.email === email && u.password === password);
   if (!user) return res.status(401).json({ message: "Invalid credentials" });
-  return res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
+  return res.json({ id: user.id, username: user.username, name: user.name, email: user.email, role: user.role });
 });
 
 // GET /api/users
@@ -371,9 +381,177 @@ app.post("/api/projects", async (req, res) => {
   }
 });
 
-// ----------------------
-// Outlook Notification Function
-// ----------------------
+// GET /api/projects/:projectId – fetch a single project by ID from within the customer's projects array
+app.get("/api/projects/:projectId", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const customer = await Customer.findOne({ "projects.id": projectId });
+    if (!customer) return res.status(404).json({ message: "Project not found" });
+    const project = customer.projects.find(p => p.id === projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    res.json({ project });
+  } catch (error) {
+    console.error("Error fetching project:", error);
+    res.status(500).json({ message: "Error fetching project" });
+  }
+});
+
+// GET /api/tasks – retrieve tasks; if query.projectId is provided, filter by that; if query.userId is provided, filter by assigned users
+app.get("/api/tasks", async (req, res) => {
+  try {
+    let query = {};
+    if (req.query.projectId) {
+      query.projectId = req.query.projectId;
+    } else if (req.query.userId) {
+      const user = USERS.find((u) => u.id.toString() === req.query.userId);
+      if (user && user.role !== "admin") {
+        query.assignedUsers = req.query.userId;
+      }
+    }
+    const tasksDocs = await Task.find(query);
+    const tasks = tasksDocs.map((t) => {
+      const taskObj = t.toObject();
+      taskObj.id = t._id.toString();
+      taskObj.isLate = taskObj.status === "pending" && new Date(taskObj.dueDate) < new Date();
+      return taskObj;
+    });
+    return res.json(tasks);
+  } catch (error) {
+    console.error("Error fetching tasks:", error);
+    return res.status(500).json({ message: "Error fetching tasks" });
+  }
+});
+
+// GET /api/tasks/:taskId – fetch a single task by its ID
+app.get("/api/tasks/:taskId", async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.taskId);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    const taskObj = task.toObject();
+    taskObj.id = task._id.toString();
+    taskObj.isLate = taskObj.status === "pending" && new Date(taskObj.dueDate) < new Date();
+    res.json({ task: taskObj });
+  } catch (error) {
+    console.error("Error fetching task:", error);
+    res.status(500).json({ message: "Error fetching task" });
+  }
+});
+
+// POST /api/tasks – create task (new endpoint for project tasks)
+app.post("/api/tasks", upload.array("files"), async (req, res) => {
+  try {
+    const { projectId, projectName, title, description, assignedUsers, createdBy, dueDate } = req.body;
+    if (!projectId) return res.status(400).json({ message: "projectId is required" });
+    let parsedAssignedUsers = [];
+    try {
+      parsedAssignedUsers = req.body.assignedUsers ? JSON.parse(req.body.assignedUsers) : [];
+    } catch (e) {
+      parsedAssignedUsers = [];
+    }
+    // Retrieve the project details from the customer
+    const customer = await Customer.findOne({ "projects.id": projectId });
+    if (!customer) return res.status(404).json({ message: "Customer for the project not found" });
+    const project = customer.projects.find(p => p.id === projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const newTask = await Task.create({
+      projectId,
+      projectName,
+      title,
+      description,
+      assignedUsers: parsedAssignedUsers,
+      dueDate,
+      attachments: req.files ? req.files.map(file => ({ name: file.originalname, url: "/uploads/" + file.filename })) : [],
+      createdBy,
+      status: "pending",
+      projectDetails: project
+    });
+    try {
+      await createActivityLog("Task Creation", createdBy, `Task "${title}" created for project "${projectName}".`);
+    } catch (logError) {
+      console.error("Activity log error:", logError);
+    }
+    res.status(201).json({ task: newTask });
+  } catch (error) {
+    console.error("Error creating tasks:", error);
+    res.status(500).json({ message: error.message || "Error creating tasks" });
+  }
+});
+
+// PUT /api/tasks/:taskId – update task (reroute/edit)
+app.put("/api/tasks/:taskId", upload.array("files"), async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { title, description, dueDate, assignedUsers } = req.body;
+    const files = req.files;
+    const updateData = {
+      title,
+      description,
+      dueDate,
+      assignedUsers: JSON.parse(assignedUsers),
+    };
+    if (files && files.length > 0) {
+      updateData.attachments = files.map((file) => ({ name: file.originalname, url: "/uploads/" + file.filename }));
+    }
+    const updatedTask = await Task.findByIdAndUpdate(taskId, updateData, { new: true });
+    await createActivityLog("Task Update", req.body.updatedBy || "unknown", `Task ${taskId} updated.`);
+    res.json({ task: updatedTask });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error updating task" });
+  }
+});
+
+// PUT /api/tasks/:taskId/respond – respond to task
+app.put("/api/tasks/:taskId/respond", responseUpload.single("file"), async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { userId, userName, status, reason } = req.body;
+    const fileUrl = req.file ? "/uploads/" + req.file.filename : "";
+    const taskDoc = await Task.findById(taskId);
+    if (!taskDoc) return res.status(404).json({ message: "Task not found" });
+    if (!taskDoc.assignedUsers.includes(userId.toString())) {
+      return res.status(403).json({ message: "User not assigned to this task" });
+    }
+    const isLate = new Date() > new Date(taskDoc.dueDate);
+    const existingResponse = taskDoc.responses.find((r) => r.userId === userId.toString());
+    if (existingResponse) {
+      existingResponse.status = status;
+      existingResponse.reason = reason;
+      existingResponse.fileUrl = fileUrl;
+      existingResponse.late = isLate;
+      existingResponse.timestamp = new Date();
+    } else {
+      taskDoc.responses.push({
+        userId: userId.toString(),
+        userName,
+        status,
+        reason,
+        fileUrl,
+        late: isLate,
+        timestamp: new Date(),
+      });
+    }
+    await taskDoc.save();
+    res.json({ task: taskDoc });
+  } catch (error) {
+    console.error("Error responding to task:", error);
+    res.status(500).json({ message: "Error responding to task" });
+  }
+});
+
+// POST /api/tasks/:taskId/remind – send reminder email for pending task
+app.post("/api/tasks/:taskId/remind", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const taskDoc = await Task.findById(taskId);
+    if (!taskDoc) return res.status(404).json({ message: "Task not found" });
+    res.json({ message: "Reminder sent" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error sending reminder" });
+  }
+});
+
 async function sendOutlookNotification(recipients, subject, content) {
   try {
     if (!recipients || !recipients.length) {

@@ -1,39 +1,115 @@
-
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Plus, ArrowRight } from "lucide-react";
-import { mockProjects, mockTasks } from "@/data/mockData";
-import { useAuth } from "@/contexts/AuthContext";
+import Header from "@/components/Header";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip
 } from "recharts";
-import Header from "@/components/Header";
+import { toast } from "sonner";
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  completedSubtasks: number;
+  totalSubtasks: number;
+  dueDate: string;
+}
+
+interface Project {
+  id: string;
+  customerId: string;
+  customerName: string;
+  name: string;
+  description: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  priority: string;
+  progress: number;
+  tasks: {
+    total: number;
+    completed: number;
+    pending: number;
+    stuck: number;
+  };
+  inlineInspection: boolean;
+  technicalSpecsDoc: string;
+  qapCriteria: boolean;
+  qapDocument?: string;
+  tenderDocument: string;
+  productType: string;
+  plant: string;
+  otherDocuments: string[];
+  uploadedAt: string;
+}
 
 const ProjectDetail = () => {
-  const { projectId } = useParams();
+  const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
-  const project = mockProjects.find((p) => p.id === projectId);
-  const projectTasks = mockTasks.filter((t) => t.projectId === projectId);
+  const [project, setProject] = useState<Project | null>(null);
+  const [projectTasks, setProjectTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const res = await fetch(`http://localhost:3000/api/projects/${projectId}`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch project");
+        }
+        const data = await res.json();
+        setProject(data.project);
+      } catch (error) {
+        console.error("Error fetching project:", error);
+        toast.error("Error fetching project details");
+      }
+    };
+
+    const fetchTasks = async () => {
+      try {
+        const res = await fetch(`http://localhost:3000/api/tasks?projectId=${projectId}`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch tasks");
+        }
+        const data = await res.json();
+        setProjectTasks(data);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        toast.error("Error fetching project tasks");
+      }
+    };
+
+    Promise.all([fetchProject(), fetchTasks()]).finally(() => setLoading(false));
+  }, [projectId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   if (!project) {
     return <div>Project not found</div>;
   }
 
   const tasksByStatus = {
-    completed: projectTasks.filter(t => t.status === "completed").length,
-    inProgress: projectTasks.filter(t => t.status === "in-progress").length,
-    pending: projectTasks.filter(t => t.status === "pending").length,
-    stuck: projectTasks.filter(t => t.status === "stuck").length,
+    completed: projectTasks.filter((t) => t.status === "completed").length,
+    inProgress: projectTasks.filter((t) => t.status === "in-progress").length,
+    pending: projectTasks.filter((t) => t.status === "pending").length,
+    stuck: projectTasks.filter((t) => t.status === "stuck").length,
   };
 
   const pieChartData = [
@@ -47,25 +123,32 @@ const ProjectDetail = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="container mx-auto p-6 space-y-6">
+        {/* Header with Project Title and Actions */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">{project.name}</h1>
             <p className="text-gray-500">{project.description}</p>
           </div>
-          {user?.role === "manager" && (
+          <div className="flex gap-2">
+            {/* Existing Create Task button (for managers, for example) */}
+            {/*
+              (If you need to preserve conditional rendering based on user role, you can add that condition.)
+              Here, we add the new Create Task Page button unconditionally for roles that can create tasks.
+            */}
             <button
               onClick={() => navigate(`/project/${projectId}/create-task`)}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Create Task
+              Create Task Page
             </button>
-          )}
+          </div>
         </div>
         
+        {/* Project Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg border p-4">
-            <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
+            <h3 className="text-sm font-medium text-gray-500">Status</h3>
             <p className={`text-2xl font-semibold ${
               project.status === "active" ? "text-green-600" :
               project.status === "completed" ? "text-blue-600" :
@@ -73,11 +156,11 @@ const ProjectDetail = () => {
             }`}>{project.status}</p>
           </div>
           <div className="bg-white rounded-lg border p-4">
-            <h3 className="text-sm font-medium text-muted-foreground">Budget</h3>
+            <h3 className="text-sm font-medium text-gray-500">Budget</h3>
             <p className="text-2xl font-semibold">${project.budget.toLocaleString()}</p>
           </div>
           <div className="bg-white rounded-lg border p-4">
-            <h3 className="text-sm font-medium text-muted-foreground">Progress</h3>
+            <h3 className="text-sm font-medium text-gray-500">Progress</h3>
             <div className="space-y-2">
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
@@ -89,7 +172,7 @@ const ProjectDetail = () => {
             </div>
           </div>
           <div className="bg-white rounded-lg border p-4">
-            <h3 className="text-sm font-medium text-muted-foreground">Priority</h3>
+            <h3 className="text-sm font-medium text-gray-500">Priority</h3>
             <p className={`text-2xl font-semibold ${
               project.priority === "high" ? "text-red-600" :
               project.priority === "medium" ? "text-yellow-600" :
@@ -98,6 +181,7 @@ const ProjectDetail = () => {
           </div>
         </div>
 
+        {/* Charts and Timeline */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-lg border p-6">
             <h2 className="text-xl font-semibold mb-4">Task Progress Overview</h2>
@@ -132,7 +216,7 @@ const ProjectDetail = () => {
               </div>
               <div className="w-full h-2 bg-gray-200 rounded-full">
                 <div
-                  className="h-2 bg-primary rounded-full"
+                  className="bg-primary h-2 rounded-full"
                   style={{ width: `${project.progress}%` }}
                 />
               </div>
@@ -144,12 +228,13 @@ const ProjectDetail = () => {
           </div>
         </div>
 
+        {/* Tasks Table */}
         <div className="bg-white rounded-lg border shadow-sm">
           <div className="p-6 border-b">
             <h2 className="text-xl font-semibold">Tasks</h2>
           </div>
           <table className="w-full">
-            <thead className="bg-muted">
+            <thead className="bg-gray-200">
               <tr>
                 <th className="p-4 text-left">Task</th>
                 <th className="p-4 text-left">Status</th>

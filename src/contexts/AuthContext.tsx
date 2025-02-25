@@ -8,12 +8,16 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Updated mockUsers with an "id" property
-const mockUsers = [
+// Updated users array based on provided credentials
+const users = [
   { id: "1", username: "s", password: "s", role: "sales", name: "Sales Team Member" },
   { id: "2", username: "p", password: "p", role: "manager", name: "Praful" },
-  { id: "3", username: "c", password: "c", role: "common", name: "Common User" },
-] as const;
+  { id: "3", username: "a", password: "a", role: "common", name: "Common User 1" },
+  { id: "4", username: "b", password: "b", role: "common", name: "Common User 2" },
+  { id: "5", username: "c", password: "c", role: "common", name: "Common User 3" },
+  { id: "6", username: "d", password: "d", role: "common", name: "Common User 4" },
+  { id: "7", username: "e", password: "e", role: "common", name: "Common User 5" },
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>(() => {
@@ -25,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const login = async (username: string, password: string) => {
-    const user = mockUsers.find(
+    const user = users.find(
       (u) => u.username === username && u.password === password
     );
 
@@ -33,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData: User = {
         id: user.id,
         username: user.username,
-        role: user.role as User["role"],
+        role: user.role,
         name: user.name,
       };
       localStorage.setItem("user", JSON.stringify(userData));
