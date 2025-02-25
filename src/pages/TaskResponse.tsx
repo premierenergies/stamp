@@ -3,6 +3,23 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import Header from "@/components/Header";
+import { Checkbox } from "@/components/ui/checkbox";  // Added missing import
+
+// Helper to convert fake file paths to absolute URLs.
+const getDocumentUrl = (docPath: string): string => {
+  if (!docPath) return "";
+  if (docPath.startsWith("C:\\fakepath\\")) {
+    const filename = docPath.split("\\").pop();
+    return `http://localhost:3000/uploads/${filename}`;
+  }
+  if (docPath.startsWith("/uploads/")) {
+    return `http://localhost:3000${docPath}`;
+  }
+  if (docPath.startsWith("http")) {
+    return docPath;
+  }
+  return docPath;
+};
 
 const TaskResponse = () => {
   const { taskId } = useParams<{ taskId: string }>();
@@ -11,6 +28,9 @@ const TaskResponse = () => {
   const [task, setTask] = useState<any>(null);
   const [comment, setComment] = useState("");
   const [attachments, setAttachments] = useState<FileList | null>(null);
+  const [forwardUsers, setForwardUsers] = useState<string[]>([]);
+  const [backwardReason, setBackwardReason] = useState("");
+  const [allUsers, setAllUsers] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchTask = async () => {
@@ -26,18 +46,30 @@ const TaskResponse = () => {
         toast.error("Error fetching task details");
       }
     };
+
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch("http://localhost:3000/api/users");
+        if (!res.ok) throw new Error("Failed to fetch users");
+        const data = await res.json();
+        setAllUsers(data);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Error fetching users");
+      }
+    };
+
     fetchTask();
+    fetchUsers();
   }, [taskId]);
 
   if (!task) {
     return <div className="p-6">Task not found</div>;
   }
 
-  // Use fallback for projectDetails if missing.
   const projectDetails = task.projectDetails || {
     customerName: "N/A",
     projectTitle: "N/A",
-    // Ensure deliveryDateRange is defined even if missing in task data.
     deliveryDateRange: { start: "N/A", end: "N/A" },
     plant: "N/A",
     productType: "N/A",
@@ -49,26 +81,120 @@ const TaskResponse = () => {
     otherDocuments: [],
   };
 
-  // Ensure deliveryDateRange exists.
   const deliveryDateRange = projectDetails.deliveryDateRange || { start: "N/A", end: "N/A" };
 
   const handleApprove = () => {
-    toast.success("Task approved successfully!");
-    navigate("/dashboard");
+    // Call endpoint to approve task (using respond endpoint with status approved)
+    fetch(`http://localhost:3000/api/tasks/${task.id}/respond`, {
+      method: "PUT",
+      body: (() => {
+        const formData = new FormData();
+        formData.append("userId", user?.id || "");
+        formData.append("userName", user?.name || "");
+        formData.append("status", "approved");
+        formData.append("reason", "");
+        return formData;
+      })(),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        toast.success("Task approved successfully!");
+        navigate("/dashboard");
+      })
+      .catch((err) => {
+        console.error("Error approving task:", err);
+        toast.error("Error approving task");
+      });
   };
 
   const handleComment = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Comment added successfully!");
-    setComment("");
+    // Call endpoint to add comment (using respond endpoint with status 'rejected' for comments)
+    const formData = new FormData();
+    formData.append("userId", user?.id || "");
+    formData.append("userName", user?.name || "");
+    formData.append("status", "rejected"); // Using 'rejected' to indicate non-approval comment
+    formData.append("reason", comment);
+    fetch(`http://localhost:3000/api/tasks/${task.id}/respond`, {
+      method: "PUT",
+      body: formData,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        toast.success("Comment added successfully!");
+        setComment("");
+        setTask(data.task);
+      })
+      .catch((err) => {
+        console.error("Error adding comment:", err);
+        toast.error("Error adding comment");
+      });
   };
 
   const handleAttachments = (e: React.FormEvent) => {
     e.preventDefault();
     if (attachments && attachments.length > 0) {
-      toast.success("Attachments added successfully!");
-      setAttachments(null);
+      const formData = new FormData();
+      formData.append("userId", user?.id || "");
+      formData.append("userName", user?.name || "");
+      formData.append("status", "approved");
+      formData.append("reason", "");
+      Array.from(attachments).forEach(file => {
+        formData.append("file", file);
+      });
+      fetch(`http://localhost:3000/api/tasks/${task.id}/respond`, {
+        method: "PUT",
+        body: formData,
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          toast.success("Attachments added successfully!");
+          setAttachments(null);
+          setTask(data.task);
+        })
+        .catch((err) => {
+          console.error("Error adding attachments:", err);
+          toast.error("Error adding attachments");
+        });
     }
+  };
+
+  const handleForward = () => {
+    // Forward task to selected users (forwardUsers state)
+    fetch(`http://localhost:3000/api/tasks/${task.id}/forward`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newAssignedUsers: forwardUsers, forwardedBy: user?.id }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        toast.success("Task forwarded successfully!");
+        setTask(data.task);
+        setForwardUsers([]);
+      })
+      .catch((err) => {
+        console.error("Error forwarding task:", err);
+        toast.error("Error forwarding task");
+      });
+  };
+
+  const handleBackward = () => {
+    // Send task back to sender with a backward reason
+    fetch(`http://localhost:3000/api/tasks/${task.id}/backward`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: backwardReason, sentBy: user?.id }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        toast.success("Task sent back successfully!");
+        setTask(data.task);
+        setBackwardReason("");
+      })
+      .catch((err) => {
+        console.error("Error sending task back:", err);
+        toast.error("Error sending task back");
+      });
   };
 
   return (
@@ -121,7 +247,7 @@ const TaskResponse = () => {
               <div className="space-y-2">
                 {projectDetails.technicalSpecsDoc ? (
                   <a
-                    href={projectDetails.technicalSpecsDoc}
+                    href={getDocumentUrl(projectDetails.technicalSpecsDoc)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block text-primary hover:underline"
@@ -133,7 +259,7 @@ const TaskResponse = () => {
                 )}
                 {projectDetails.qapDocument ? (
                   <a
-                    href={projectDetails.qapDocument}
+                    href={getDocumentUrl(projectDetails.qapDocument)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block text-primary hover:underline"
@@ -145,7 +271,7 @@ const TaskResponse = () => {
                 ) : null}
                 {projectDetails.tenderDocument ? (
                   <a
-                    href={projectDetails.tenderDocument}
+                    href={getDocumentUrl(projectDetails.tenderDocument)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block text-primary hover:underline"
@@ -155,11 +281,11 @@ const TaskResponse = () => {
                 ) : (
                   <p className="text-gray-500">N/A</p>
                 )}
-                {projectDetails.otherDocuments && projectDetails.otherDocuments.length > 0 ? (
+                {Array.isArray(projectDetails.otherDocuments) && projectDetails.otherDocuments.length > 0 ? (
                   projectDetails.otherDocuments.map((doc: string, index: number) => (
                     <a
                       key={index}
-                      href={doc}
+                      href={getDocumentUrl(doc)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block text-primary hover:underline"
@@ -214,6 +340,50 @@ const TaskResponse = () => {
                     Add Comment
                   </button>
                 </form>
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold mb-2">Forward Task</h3>
+                  <div className="space-y-2">
+                    {allUsers.map((u) => (
+                      <div key={u.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`forward-${u.id}`}
+                          checked={forwardUsers.includes(u.id.toString())}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setForwardUsers([...forwardUsers, u.id.toString()]);
+                            } else {
+                              setForwardUsers(forwardUsers.filter(id => id !== u.id.toString()));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`forward-${u.id}`}>{u.name}</label>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleForward}
+                    className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors mt-2"
+                  >
+                    Forward Task
+                  </button>
+                </div>
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold mb-2">Send Back Task</h3>
+                  <textarea
+                    value={backwardReason}
+                    onChange={(e) => setBackwardReason(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg"
+                    placeholder="Enter reason for sending back..."
+                    rows={2}
+                    required
+                  />
+                  <button
+                    onClick={handleBackward}
+                    className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors mt-2"
+                  >
+                    Send Back Task
+                  </button>
+                </div>
               </div>
             </div>
             <div className="bg-white rounded-lg border p-6">

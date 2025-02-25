@@ -57,7 +57,7 @@ const client = Client.initWithMiddleware({
   },
 });
 
-// Use the updated credentials
+// Updated USERS using hardcoded credentials
 const USERS = [
   { id: 1, username: "s", password: "s", role: "sales", name: "Sales Team Member" },
   { id: 2, username: "p", password: "p", role: "manager", name: "Praful" },
@@ -175,14 +175,14 @@ const taskResponseSchema = new mongoose.Schema({
 });
 
 // ----------------------
-// Task Schema – updated for project tasks with projectDetails field
+// Task Schema – updated for project tasks with projectDetails field and stuckWith field
 // ----------------------
 const taskSchema = new mongoose.Schema({
   projectId: { type: String, required: true },
   projectName: { type: String, required: true },
   title: { type: String, required: true },
   description: { type: String, required: true },
-  status: { type: String, enum: ["pending", "in-progress", "completed", "stuck", "approved"], default: "pending" },
+  status: { type: String, enum: ["pending", "in-progress", "completed", "stuck", "approved", "backward"], default: "pending" },
   assignedUsers: { type: [String], default: [] },
   dueDate: { type: String, required: true },
   attachments: { type: [{ name: String, url: String }], default: [] },
@@ -196,6 +196,7 @@ const taskSchema = new mongoose.Schema({
     timestamp: Date,
   },
   projectDetails: { type: Object, default: {} },
+  stuckWith: { type: [String], default: [] }
 });
 const Task = mongoose.model("Task", taskSchema);
 
@@ -531,11 +532,61 @@ app.put("/api/tasks/:taskId/respond", responseUpload.single("file"), async (req,
         timestamp: new Date(),
       });
     }
+    // Check all assigned responses
+    const responsesMap = {};
+    taskDoc.responses.forEach(r => { responsesMap[r.userId] = r.status; });
+    const stuckWith = taskDoc.assignedUsers.filter(u => responsesMap[u] !== "approved");
+    taskDoc.stuckWith = stuckWith;
+    if (stuckWith.length === 0 && taskDoc.assignedUsers.length > 0) {
+      taskDoc.status = "approved";
+      await createActivityLog("Task Fully Approved", userId, `Task ${taskId} has been fully approved by all assigned users.`);
+    } else {
+      taskDoc.status = "stuck";
+      await createActivityLog("Task Marked Stuck", userId, `Task ${taskId} is stuck. Pending approvals from: ${stuckWith.join(", ")}`);
+    }
     await taskDoc.save();
     res.json({ task: taskDoc });
   } catch (error) {
     console.error("Error responding to task:", error);
     res.status(500).json({ message: "Error responding to task" });
+  }
+});
+
+// POST /api/tasks/:taskId/forward – forward task to additional users
+app.post("/api/tasks/:taskId/forward", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { newAssignedUsers } = req.body; // expected to be an array of user IDs
+    const taskDoc = await Task.findById(taskId);
+    if (!taskDoc) return res.status(404).json({ message: "Task not found" });
+    // Add new users ensuring uniqueness
+    const updatedUsers = Array.from(new Set([...taskDoc.assignedUsers, ...newAssignedUsers]));
+    taskDoc.assignedUsers = updatedUsers;
+    await createActivityLog("Task Forwarded", req.body.forwardedBy || "unknown", `Task ${taskId} forwarded to: ${newAssignedUsers.join(", ")}`);
+    await taskDoc.save();
+    res.json({ task: taskDoc });
+  } catch (error) {
+    console.error("Error forwarding task:", error);
+    res.status(500).json({ message: "Error forwarding task" });
+  }
+});
+
+// POST /api/tasks/:taskId/backward – send task back to sender
+app.post("/api/tasks/:taskId/backward", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { reason } = req.body;
+    const taskDoc = await Task.findById(taskId);
+    if (!taskDoc) return res.status(404).json({ message: "Task not found" });
+    // Set status to backward and assign task back to the creator
+    taskDoc.status = "backward";
+    taskDoc.assignedUsers = [taskDoc.createdBy];
+    await createActivityLog("Task Sent Back", req.body.sentBy || "unknown", `Task ${taskId} sent back to sender. Reason: ${reason}`);
+    await taskDoc.save();
+    res.json({ task: taskDoc });
+  } catch (error) {
+    console.error("Error sending task back:", error);
+    res.status(500).json({ message: "Error sending task back" });
   }
 });
 

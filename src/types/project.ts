@@ -3,7 +3,7 @@ export type ProjectStatus = "active" | "completed" | "on-hold";
 export type TaskStatus = "pending" | "in-progress" | "completed" | "stuck" | "approved";
 export type Priority = "low" | "medium" | "high";
 export type Plant = "PEPPL" | "PEIPL" | "PEGEPL 1" | "PEGEPL 2";
-export type ProductType = "PERCE" | "TOPCON M10" | "TOPCON G12R";
+export type ProductType = "PERC" | "TOPCON M10" | "TOPCON G12R";
 
 export interface Project {
   id: string;
@@ -49,7 +49,6 @@ export interface Task {
   timeSpent: number;
   completedSubtasks: number;
   totalSubtasks: number;
-  // New fields
   projectDetails: {
     customerName: string;
     projectTitle: string;

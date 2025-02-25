@@ -18,6 +18,22 @@ const userList = [
   { id: "c", name: "Common User" },
 ];
 
+// Helper to convert fake paths to absolute URL
+const getDocumentUrl = (docPath: string): string => {
+  if (!docPath) return "";
+  if (docPath.startsWith("C:\\fakepath\\")) {
+    const filename = docPath.split("\\").pop();
+    return `http://localhost:3000/uploads/${filename}`;
+  }
+  if (docPath.startsWith("/uploads/")) {
+    return `http://localhost:3000${docPath}`;
+  }
+  if (docPath.startsWith("http")) {
+    return docPath;
+  }
+  return docPath;
+};
+
 const CreateTask = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -205,7 +221,7 @@ const CreateTask = () => {
               <label className="block text-sm font-medium mb-1">Technical Specifications Document</label>
               {project.technicalSpecsDoc ? (
                 <a
-                  href={project.technicalSpecsDoc}
+                  href={getDocumentUrl(project.technicalSpecsDoc)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-primary hover:underline"
@@ -235,7 +251,7 @@ const CreateTask = () => {
                 <label className="block text-sm font-medium mb-1">QAP Document</label>
                 {project.qapDocument ? (
                   <a
-                    href={project.qapDocument}
+                    href={getDocumentUrl(project.qapDocument)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block text-primary hover:underline"
@@ -256,7 +272,7 @@ const CreateTask = () => {
               <label className="block text-sm font-medium mb-1">Tender Document</label>
               {project.tenderDocument ? (
                 <a
-                  href={project.tenderDocument}
+                  href={getDocumentUrl(project.tenderDocument)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-primary hover:underline"
@@ -278,7 +294,7 @@ const CreateTask = () => {
                 project.otherDocuments.map((doc: string, index: number) => (
                   <a
                     key={index}
-                    href={doc}
+                    href={getDocumentUrl(doc)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block text-primary hover:underline"
