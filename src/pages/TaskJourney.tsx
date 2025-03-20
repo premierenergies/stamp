@@ -1,151 +1,281 @@
-
+// TaskJourney.tsx
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockTasks } from "@/data/mockData";
+import { toast } from "sonner";
 import Header from "@/components/Header";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from "recharts";
+
+interface ActivityLog {
+  _id: string;
+  action: string;
+  userId: string;
+  details: string;
+  timestamp: string;
+}
+
+interface Task {
+  id: string;
+  projectId: string;
+  projectDetails: {
+    customerId: string;
+  };
+  title: string;
+  responses: Array<{
+    userId: string;
+    userName: string;
+    status: string;
+    reason: string;
+    timestamp: string;
+  }>;
+}
+
+interface User {
+  id: string;
+  username: string;
+  name: string;
+  role: string;
+}
 
 const TaskJourney = () => {
+  const { taskId } = useParams<{ taskId: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const completedTasks = mockTasks.filter(
-    (task) => task.status === "completed" || task.status === "approved"
-  );
-  const stuckTasks = mockTasks.filter((task) => task.status === "stuck");
 
-  // Calculate metrics
-  const totalTasks = mockTasks.length;
-  const completionRate = (completedTasks.length / totalTasks) * 100;
-  const avgTimeSpent = completedTasks.reduce((acc, task) => acc + task.timeSpent, 0) / completedTasks.length;
+  // State for task details and activity logs from customer, project, and task sources.
+  const [task, setTask] = useState<Task | null>(null);
+  const [customerLogs, setCustomerLogs] = useState<ActivityLog[]>([]);
+  const [projectLogs, setProjectLogs] = useState<ActivityLog[]>([]);
+  const [taskLogs, setTaskLogs] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
 
-  const pieData = [
-    { name: "Completed", value: completedTasks.length, color: "#22C55E" },
-    { name: "Stuck", value: stuckTasks.length, color: "#EF4444" },
-  ];
+  // For reassigning and sending back
+  const [reassignUsers, setReassignUsers] = useState<string[]>([]);
+  const [forwardComment, setForwardComment] = useState("");
+  const [backwardReason, setBackwardReason] = useState("");
 
-  const timelineData = completedTasks.map(task => ({
-    name: task.title,
-    timeSpent: task.timeSpent,
-  }));
+  // Fetch task details (including responses)
+  useEffect(() => {
+    const fetchTaskDetails = async () => {
+      try {
+        const res = await fetch(`http://localhost:3000/api/tasks/${taskId}`);
+        if (!res.ok) throw new Error("Failed to fetch task details");
+        const data = await res.json();
+        setTask(data.task);
+      } catch (error) {
+        console.error("Error fetching task details:", error);
+        toast.error("Error fetching task details");
+      }
+    };
+    fetchTaskDetails();
+  }, [taskId]);
+
+  // Once task is loaded, fetch related activity logs
+  useEffect(() => {
+    if (task && task.projectId && task.projectDetails?.customerId) {
+      const fetchLogs = async () => {
+        try {
+          const [custRes, projRes, taskRes] = await Promise.all([
+            fetch(`http://localhost:3000/api/activity/customer/${task.projectDetails.customerId}`),
+            fetch(`http://localhost:3000/api/activity/project/${task.projectId}`),
+            fetch(`http://localhost:3000/api/tasks/${taskId}/activity`)
+          ]);
+          if (!custRes.ok) throw new Error("Failed to fetch customer logs");
+          if (!projRes.ok) throw new Error("Failed to fetch project logs");
+          if (!taskRes.ok) throw new Error("Failed to fetch task logs");
+          const custLogs = await custRes.json();
+          const projLogs = await projRes.json();
+          const tLogs = await taskRes.json();
+          setCustomerLogs(custLogs);
+          setProjectLogs(projLogs);
+          setTaskLogs(tLogs);
+        } catch (error) {
+          console.error("Error fetching logs:", error);
+          toast.error("Error fetching logs");
+        }
+      };
+      fetchLogs();
+    }
+  }, [task, taskId]);
+
+  // Fetch all users (for reassign dropdown)
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch("http://localhost:3000/api/users");
+        if (!res.ok) throw new Error("Failed to fetch users");
+        const data = await res.json();
+        setUsers(data);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Error fetching users");
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Mark loading as false when task is fetched
+  useEffect(() => {
+    if (task) {
+      setLoading(false);
+    }
+  }, [task, customerLogs, projectLogs, taskLogs]);
+
+  // Combine all logs and sort them by timestamp
+  const allLogs: ActivityLog[] = [...customerLogs, ...projectLogs, ...taskLogs];
+  allLogs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  // Handler for reassigning task
+  const handleReassign = async () => {
+    if (!reassignUsers.length) {
+      toast.error("Please select at least one user to reassign the task.");
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:3000/api/tasks/${taskId}/forward`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newAssignedUsers: reassignUsers, forwardedBy: user?.id, comment: forwardComment })
+      });
+      if (!res.ok) throw new Error("Failed to reassign task");
+      const data = await res.json();
+      setTask(data.task);
+      toast.success("Task reassigned successfully!");
+      setReassignUsers([]);
+      setForwardComment("");
+    } catch (error) {
+      console.error("Error reassigning task:", error);
+      toast.error("Error reassigning task");
+    }
+  };
+
+  // Handler for sending task back
+  const handleSendBack = async () => {
+    if (!backwardReason) {
+      toast.error("Please provide a reason for sending the task back.");
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:3000/api/tasks/${taskId}/backward`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: backwardReason, sentBy: user?.id })
+      });
+      if (!res.ok) throw new Error("Failed to send task back");
+      const data = await res.json();
+      setTask(data.task);
+      toast.success("Task sent back successfully!");
+      setBackwardReason("");
+    } catch (error) {
+      console.error("Error sending task back:", error);
+      toast.error("Error sending task back");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="container mx-auto p-6 space-y-6">
-        <h1 className="text-3xl font-bold">Task Journey</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-500">Completion Rate</h3>
-            <p className="text-3xl font-bold text-green-600">{completionRate.toFixed(1)}%</p>
-            <p className="text-sm text-gray-500 mt-1">
-              {completedTasks.length} out of {totalTasks} tasks completed
-            </p>
-          </div>
-          
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-500">Average Time Spent</h3>
-            <p className="text-3xl font-bold text-blue-600">{avgTimeSpent.toFixed(1)}h</p>
-            <p className="text-sm text-gray-500 mt-1">Per completed task</p>
-          </div>
-          
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-500">Stuck Tasks</h3>
-            <p className="text-3xl font-bold text-red-600">{stuckTasks.length}</p>
-            <p className="text-sm text-gray-500 mt-1">Need attention</p>
-          </div>
+      <div className="container mx-auto p-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-primary hover:text-primary/80 flex items-center gap-1 mb-4"
+        >
+          &larr; Back
+        </button>
+        <h1 className="text-3xl font-bold mb-6">Task Journey: {task?.title}</h1>
+
+        {/* Vertical Timeline */}
+        <div className="relative border-l-2 border-gray-300 ml-8 mb-8">
+          {allLogs.map((log, index) => (
+            <div key={log._id} className="mb-8 flex items-start">
+              <div className="absolute -left-4 flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                  {index + 1}
+                </div>
+                {index !== allLogs.length - 1 && <div className="flex-1 w-px bg-gray-300 mt-1"></div>}
+              </div>
+              <div className="ml-6 bg-white p-4 rounded-lg shadow-md w-full">
+                <h3 className="font-semibold text-lg">{log.action}</h3>
+                <p className="text-gray-700">{log.details}</p>
+                <span className="text-sm text-gray-500">{new Date(log.timestamp).toLocaleString()}</span>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Task Status Distribution</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Time Spent Timeline</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timelineData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="timeSpent" stroke="#3B82F6" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Completed Tasks</h2>
+        {/* Responses List */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">Responses</h2>
+          {task?.responses && task.responses.length > 0 ? (
             <div className="space-y-4">
-              {completedTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 border rounded-lg bg-green-50 space-y-2 hover:bg-green-100 transition-colors"
-                >
-                  <h3 className="font-medium">{task.title}</h3>
-                  <p className="text-sm text-gray-600">{task.description}</p>
-                  <div className="flex justify-between text-sm text-gray-500">
-                    <span>Completed on: {task.dueDate}</span>
-                    <span>Time spent: {task.timeSpent}h</span>
+              {task.responses.map((response, idx) => (
+                <div key={idx} className="p-4 border rounded-lg bg-white shadow">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">{response.userName}</span>
+                    <span className="text-sm text-gray-500">{new Date(response.timestamp).toLocaleString()}</span>
                   </div>
+                  <p className="text-gray-700">Status: {response.status}</p>
+                  <p className="text-gray-700">Comment: {response.reason || "N/A"}</p>
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Stuck Tasks</h2>
-            <div className="space-y-4">
-              {stuckTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 border rounded-lg bg-red-50 space-y-2 hover:bg-red-100 transition-colors"
-                >
-                  <h3 className="font-medium">{task.title}</h3>
-                  <p className="text-sm text-gray-600">{task.description}</p>
-                  <div className="flex justify-between text-sm text-gray-500">
-                    <span>Due: {task.dueDate}</span>
-                    <span>Priority: {task.priority}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : (
+            <p className="text-gray-500">No responses yet.</p>
+          )}
         </div>
-      </main>
+
+        {/* Reassign Task Section */}
+        <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold mb-4">Reassign Task</h2>
+          <p className="mb-2">Select user(s) to reassign the task:</p>
+          <select
+            multiple
+            className="w-full border p-2 rounded-lg mb-4"
+            value={reassignUsers}
+            onChange={(e) => {
+              const selected = Array.from(e.target.selectedOptions, option => option.value);
+              setReassignUsers(selected);
+            }}
+          >
+            {users
+              .filter(u => u.role !== "sales") // Exclude sales users
+              .map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+          </select>
+          <textarea
+            placeholder="Optional: Add a comment for reassignment"
+            className="w-full border p-2 rounded-lg mb-4"
+            value={forwardComment}
+            onChange={(e) => setForwardComment(e.target.value)}
+          />
+          <button
+            onClick={handleReassign}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Reassign Task
+          </button>
+        </div>
+
+        {/* Send Task Back Section */}
+        <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold mb-4">Send Task Back</h2>
+          <textarea
+            placeholder="Enter reason for sending task back"
+            className="w-full border p-2 rounded-lg mb-4"
+            value={backwardReason}
+            onChange={(e) => setBackwardReason(e.target.value)}
+          />
+          <button
+            onClick={handleSendBack}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Send Task Back
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+// App.tsx
+import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, Navigate } from "react-router-dom";
@@ -22,7 +22,6 @@ const App = () => (
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
@@ -30,7 +29,7 @@ const App = () => (
           <Route path="/project/:projectId" element={<ProjectDetail />} />
           <Route path="/create-project/:customerId" element={<CreateProject />} />
           <Route path="/project/:projectId/create-task" element={<CreateTask />} />
-          <Route path="/task-journey" element={<TaskJourney />} />
+          <Route path="/task/:taskId/journey" element={<TaskJourney />} />
           <Route path="/task/:taskId/respond" element={<TaskResponse />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

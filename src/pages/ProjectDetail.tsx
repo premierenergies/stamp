@@ -1,3 +1,4 @@
+// ProjectDetail.tsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Plus, ArrowRight } from "lucide-react";
@@ -13,6 +14,26 @@ import {
   Tooltip
 } from "recharts";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+
+// Inline helper to convert file paths to absolute URLs using the current origin.
+// This version encodes the URL so that spaces and special characters are handled correctly.
+const getDocumentUrl = (docPath: string): string => {
+  if (!docPath) return "";
+  const origin = window.location.origin;
+  if (docPath.startsWith("C:\\fakepath\\")) {
+    const filename = docPath.split("\\").pop();
+    return `${origin}/uploads/${encodeURIComponent(filename || "")}`;
+  }
+  if (docPath.startsWith("/uploads/")) {
+    // encode the entire URL portion after the origin
+    return `${origin}${encodeURI(docPath)}`;
+  }
+  if (docPath.startsWith("http")) {
+    return docPath;
+  }
+  return docPath;
+};
 
 interface Task {
   id: string;
@@ -54,11 +75,25 @@ interface Project {
   uploadedAt: string;
 }
 
+interface DocumentItem {
+  id: string;
+  name: string;
+  url: string;
+  uploadedBy: string;
+  customerName: string;
+  projectTitle: string;
+  projectDetails: string;
+  expectedDeliverySchedule: string;
+  uploadedAt: string;
+}
+
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [projectTasks, setProjectTasks] = useState<Task[]>([]);
+  const [projectDocuments, setProjectDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -92,6 +127,19 @@ const ProjectDetail = () => {
 
     Promise.all([fetchProject(), fetchTasks()]).finally(() => setLoading(false));
   }, [projectId]);
+
+  // NEW: If logged-in user is a manager, fetch documents for this project.
+  useEffect(() => {
+    if (user?.role === "manager" && project?.name) {
+      fetch(`http://localhost:3000/api/documents?projectTitle=${encodeURIComponent(project.name)}`)
+        .then((res) => res.json())
+        .then((data) => setProjectDocuments(data))
+        .catch((error) => {
+          console.error("Error fetching project documents:", error);
+          toast.error("Error fetching project documents");
+        });
+    }
+  }, [user, project]);
 
   if (loading) {
     return (
@@ -130,21 +178,19 @@ const ProjectDetail = () => {
             <p className="text-gray-500">{project.description}</p>
           </div>
           <div className="flex gap-2">
-            {/* Existing Create Task button (for managers, for example) */}
-            {/*
-              (If you need to preserve conditional rendering based on user role, you can add that condition.)
-              Here, we add the new Create Task Page button unconditionally for roles that can create tasks.
-            */}
-            <button
-              onClick={() => navigate(`/project/${projectId}/create-task`)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Create Task Page
-            </button>
+            {/* Allow Create Task for common and manager roles */}
+            {(user?.role === "common" || user?.role === "manager") && (
+              <button
+                onClick={() => navigate(`/project/${projectId}/create-task`)}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create Task
+              </button>
+            )}
           </div>
         </div>
-        
+
         {/* Project Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg border p-4">
@@ -174,9 +220,11 @@ const ProjectDetail = () => {
           <div className="bg-white rounded-lg border p-4">
             <h3 className="text-sm font-medium text-gray-500">Priority</h3>
             <p className={`text-2xl font-semibold ${
-              project.priority === "high" ? "text-red-600" :
-              project.priority === "medium" ? "text-yellow-600" :
-              "text-green-600"
+              project.priority === "high"
+                ? "text-red-600"
+                : project.priority === "medium"
+                ? "text-yellow-600"
+                : "text-green-600"
             }`}>{project.priority}</p>
           </div>
         </div>
@@ -227,6 +275,34 @@ const ProjectDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* NEW: Section for Sales Uploaded Documents (only for managers) */}
+        {user?.role === "manager" && (
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4">Sales Uploaded Documents</h2>
+            {projectDocuments.length > 0 ? (
+              <ul className="space-y-2">
+                {projectDocuments.map((doc) => (
+                  <li key={doc.id} className="text-sm">
+                    <a
+                      href={getDocumentUrl(doc.url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {doc.name}
+                    </a>
+                    <span className="ml-2 text-gray-600">
+                      (Uploaded by {doc.uploadedBy} on {new Date(doc.uploadedAt).toLocaleString()})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-500">No documents uploaded by sales for this project.</p>
+            )}
+          </div>
+        )}
 
         {/* Tasks Table */}
         <div className="bg-white rounded-lg border shadow-sm">
@@ -285,13 +361,27 @@ const ProjectDetail = () => {
                   </td>
                   <td className="p-4 text-sm text-gray-500">{task.dueDate}</td>
                   <td className="p-4">
-                    <button
-                      onClick={() => navigate(`/task/${task.id}/respond`)}
-                      className="flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                    >
-                      View
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                    {user?.role === "sales" ? (
+                      <button
+                        disabled
+                        className="flex items-center gap-2 px-3 py-1 bg-gray-300 text-white rounded-lg cursor-not-allowed"
+                      >
+                        View
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          user?.role === "manager"
+                            ? navigate(`/task/${task.id}/journey`)
+                            : navigate(`/task/${task.id}/respond`)
+                        }
+                        className="flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                      >
+                        View
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

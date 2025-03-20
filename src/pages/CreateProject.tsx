@@ -1,3 +1,4 @@
+// CreateProject.tsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "@/components/Header";
@@ -6,14 +7,14 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel
+  FormLabel,
 } from "@/components/ui/form";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +27,14 @@ const CreateProject = () => {
   const navigate = useNavigate();
   const [customer, setCustomer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Local state for file inputs – do NOT register these with react-hook-form
+  const [technicalSpecsFile, setTechnicalSpecsFile] = useState<File | null>(null);
+  const [qapFile, setQapFile] = useState<File | null>(null);
+  const [tenderFile, setTenderFile] = useState<File | null>(null);
+  const [otherFiles, setOtherFiles] = useState<FileList | null>(null);
+
+  // Only include non‐file fields in the form defaults.
   const methods = useForm({
     defaultValues: {
       customerName: "",
@@ -34,16 +43,12 @@ const CreateProject = () => {
       deliveryDateStart: "",
       deliveryDateEnd: "",
       inlineInspection: "no",
-      technicalSpecsDoc: "",
       qapCriteria: "no",
-      qapDocument: "",
-      tenderDocument: "",
       productType: "" as ProductType,
       plant: "" as Plant,
-      otherDocuments: [] as string[],
     },
   });
-  const { control, reset, handleSubmit } = methods;
+  const { control, reset, handleSubmit, watch } = methods;
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -64,55 +69,60 @@ const CreateProject = () => {
     fetchCustomer();
   }, [customerId, reset]);
 
-  const onSubmit = (data: any) => {
-    const newProject: Project = {
-      id: Math.random().toString(36).substr(2, 9),
-      customerId: customerId!,
-      customerName: customer?.name || "",
-      name: data.name,
-      description: data.description,
-      status: "active",
-      startDate: data.deliveryDateStart,
-      endDate: data.deliveryDateEnd,
-      budget: 0,
-      priority: "medium",
-      progress: 0,
-      tasks: {
-        total: 0,
-        completed: 0,
-        pending: 0,
-        stuck: 0,
-      },
-      inlineInspection: data.inlineInspection === "yes",
-      technicalSpecsDoc: data.technicalSpecsDoc,
-      qapCriteria: data.qapCriteria === "yes",
-      qapDocument: data.qapDocument,
-      tenderDocument: data.tenderDocument,
-      productType: data.productType,
-      plant: data.plant,
-      otherDocuments: data.otherDocuments,
-      uploadedAt: new Date().toISOString(),
-    };
-
-    fetch("http://localhost:3000/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newProject, createdBy: customerId }),
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error("Failed to create project");
-        }
-        return res.json();
-      })
-      .then(() => {
-        toast.success("Project created successfully!");
-        navigate(`/projects/${customerId}`);
-      })
-      .catch((err) => {
-        console.error("Error creating project:", err);
-        toast.error(err.message || "Error creating project");
+  const onSubmit = async (data: any) => {
+    // Create a FormData instance
+    const formData = new FormData();
+    formData.append("customerId", customerId!);
+    formData.append("customerName", customer?.name || "");
+    formData.append("name", data.name);
+    formData.append("description", data.description);
+    formData.append("startDate", data.deliveryDateStart);
+    formData.append("endDate", data.deliveryDateEnd);
+    formData.append("inlineInspection", data.inlineInspection);
+    formData.append("qapCriteria", data.qapCriteria);
+    formData.append("productType", data.productType);
+    formData.append("plant", data.plant);
+    // Append file inputs if available – these values now come from local state
+    if (technicalSpecsFile) {
+      formData.append("technicalSpecsDoc", technicalSpecsFile);
+    }
+    if (data.qapCriteria === "yes" && qapFile) {
+      formData.append("qapDocument", qapFile);
+    }
+    if (tenderFile) {
+      formData.append("tenderDocument", tenderFile);
+    }
+    if (otherFiles) {
+      Array.from(otherFiles).forEach(file => {
+        formData.append("otherDocuments", file);
       });
+    }
+    // Append other project fields
+    formData.append("status", "active");
+    formData.append("budget", "0");
+    formData.append("priority", "medium");
+    formData.append("progress", "0");
+    formData.append(
+      "tasks",
+      JSON.stringify({ total: 0, completed: 0, pending: 0, stuck: 0 })
+    );
+    formData.append("uploadedAt", new Date().toISOString());
+    formData.append("createdBy", customerId!);
+
+    try {
+      const res = await fetch("http://localhost:3000/api/projects", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        throw new Error("Failed to create project");
+      }
+      toast.success("Project created successfully!");
+      navigate(`/projects/${customerId}`);
+    } catch (err: any) {
+      console.error("Error creating project:", err);
+      toast.error(err.message || "Error creating project");
+    }
   };
 
   if (loading) {
@@ -218,18 +228,47 @@ const CreateProject = () => {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={control}
-                  name="technicalSpecsDoc"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Technical Specifications Document</FormLabel>
-                      <FormControl>
-                        <Input type="file" {...field} required />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                {/* Use uncontrolled file inputs for documents */}
+                <div>
+                  <FormLabel>Technical Specifications Document</FormLabel>
+                  <Input
+                    type="file"
+                    onChange={(e) =>
+                      setTechnicalSpecsFile(e.target.files ? e.target.files[0] : null)
+                    }
+                    required
+                  />
+                </div>
+                {watch("qapCriteria") === "yes" && (
+                  <div>
+                    <FormLabel>QAP Document</FormLabel>
+                    <Input
+                      type="file"
+                      onChange={(e) =>
+                        setQapFile(e.target.files ? e.target.files[0] : null)
+                      }
+                      required
+                    />
+                  </div>
+                )}
+                <div>
+                  <FormLabel>Tender Document</FormLabel>
+                  <Input
+                    type="file"
+                    onChange={(e) =>
+                      setTenderFile(e.target.files ? e.target.files[0] : null)
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <FormLabel>Other Documents (Optional)</FormLabel>
+                  <Input
+                    type="file"
+                    multiple
+                    onChange={(e) => setOtherFiles(e.target.files)}
+                  />
+                </div>
                 <FormField
                   control={control}
                   name="qapCriteria"
@@ -247,32 +286,6 @@ const CreateProject = () => {
                           <SelectItem value="no">No</SelectItem>
                         </SelectContent>
                       </Select>
-                      {field.value === "yes" && (
-                        <FormField
-                          control={control}
-                          name="qapDocument"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>QAP Document</FormLabel>
-                              <FormControl>
-                                <Input type="file" {...field} required />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="tenderDocument"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tender Document</FormLabel>
-                      <FormControl>
-                        <Input type="file" {...field} required />
-                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -316,18 +329,6 @@ const CreateProject = () => {
                           <SelectItem value="PEGEPL 2">PEGEPL 2</SelectItem>
                         </SelectContent>
                       </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="otherDocuments"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Other Documents (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="file" multiple {...field} />
-                      </FormControl>
                     </FormItem>
                   )}
                 />

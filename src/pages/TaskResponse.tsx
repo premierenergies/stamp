@@ -1,19 +1,21 @@
+// TaskResponse.tsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import Header from "@/components/Header";
-import { Checkbox } from "@/components/ui/checkbox";  // Added missing import
+import { Checkbox } from "@/components/ui/checkbox"; // Added missing import
 
-// Helper to convert fake file paths to absolute URLs.
+// Replace your existing getDocumentUrl with this version
 const getDocumentUrl = (docPath: string): string => {
   if (!docPath) return "";
+  const origin = window.location.origin; // Use the current origin dynamically
   if (docPath.startsWith("C:\\fakepath\\")) {
     const filename = docPath.split("\\").pop();
-    return `http://localhost:3000/uploads/${filename}`;
+    return `${origin}/uploads/${filename}`;
   }
   if (docPath.startsWith("/uploads/")) {
-    return `http://localhost:3000${docPath}`;
+    return `${origin}${docPath}`;
   }
   if (docPath.startsWith("http")) {
     return docPath;
@@ -31,6 +33,8 @@ const TaskResponse = () => {
   const [forwardUsers, setForwardUsers] = useState<string[]>([]);
   const [backwardReason, setBackwardReason] = useState("");
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [hasResponded, setHasResponded] = useState(false);
+  const [userResponse, setUserResponse] = useState<any>(null);
 
   useEffect(() => {
     const fetchTask = async () => {
@@ -41,6 +45,14 @@ const TaskResponse = () => {
         }
         const data = await res.json();
         setTask(data.task);
+        // Check if current user has responded
+        const response = data.task.responses.find((r: any) => r.userId === user?.id);
+        if (response) {
+          setHasResponded(true);
+          setUserResponse(response);
+        } else {
+          setHasResponded(false);
+        }
       } catch (error) {
         console.error("Error fetching task:", error);
         toast.error("Error fetching task details");
@@ -61,7 +73,14 @@ const TaskResponse = () => {
 
     fetchTask();
     fetchUsers();
-  }, [taskId]);
+  }, [taskId, user]);
+
+  // If the logged-in user is a manager, redirect to TaskJourney.
+  useEffect(() => {
+    if (user && user.role === "manager" && task) {
+      navigate(`/task/${task.id}/journey`);
+    }
+  }, [user, task, navigate]);
 
   if (!task) {
     return <div className="p-6">Task not found</div>;
@@ -84,22 +103,26 @@ const TaskResponse = () => {
   const deliveryDateRange = projectDetails.deliveryDateRange || { start: "N/A", end: "N/A" };
 
   const handleApprove = () => {
-    // Call endpoint to approve task (using respond endpoint with status approved)
+    if (hasResponded) {
+      toast.error("You have already responded to this task.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("userId", user?.id || "");
+    formData.append("userName", user?.name || "");
+    formData.append("status", "approved");
+    formData.append("reason", "");
     fetch(`http://localhost:3000/api/tasks/${task.id}/respond`, {
       method: "PUT",
-      body: (() => {
-        const formData = new FormData();
-        formData.append("userId", user?.id || "");
-        formData.append("userName", user?.name || "");
-        formData.append("status", "approved");
-        formData.append("reason", "");
-        return formData;
-      })(),
+      body: formData,
     })
       .then((res) => res.json())
       .then((data) => {
         toast.success("Task approved successfully!");
-        navigate("/dashboard");
+        setTask(data.task);
+        setHasResponded(true);
+        const response = data.task.responses.find((r: any) => r.userId === user?.id);
+        setUserResponse(response);
       })
       .catch((err) => {
         console.error("Error approving task:", err);
@@ -109,11 +132,14 @@ const TaskResponse = () => {
 
   const handleComment = (e: React.FormEvent) => {
     e.preventDefault();
-    // Call endpoint to add comment (using respond endpoint with status 'rejected' for comments)
+    if (hasResponded) {
+      toast.error("You have already responded to this task.");
+      return;
+    }
     const formData = new FormData();
     formData.append("userId", user?.id || "");
     formData.append("userName", user?.name || "");
-    formData.append("status", "rejected"); // Using 'rejected' to indicate non-approval comment
+    formData.append("status", "rejected"); // Using 'rejected' to indicate comment
     formData.append("reason", comment);
     fetch(`http://localhost:3000/api/tasks/${task.id}/respond`, {
       method: "PUT",
@@ -124,6 +150,9 @@ const TaskResponse = () => {
         toast.success("Comment added successfully!");
         setComment("");
         setTask(data.task);
+        setHasResponded(true);
+        const response = data.task.responses.find((r: any) => r.userId === user?.id);
+        setUserResponse(response);
       })
       .catch((err) => {
         console.error("Error adding comment:", err);
@@ -133,6 +162,10 @@ const TaskResponse = () => {
 
   const handleAttachments = (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasResponded) {
+      toast.error("You have already responded to this task.");
+      return;
+    }
     if (attachments && attachments.length > 0) {
       const formData = new FormData();
       formData.append("userId", user?.id || "");
@@ -151,6 +184,9 @@ const TaskResponse = () => {
           toast.success("Attachments added successfully!");
           setAttachments(null);
           setTask(data.task);
+          setHasResponded(true);
+          const response = data.task.responses.find((r: any) => r.userId === user?.id);
+          setUserResponse(response);
         })
         .catch((err) => {
           console.error("Error adding attachments:", err);
@@ -160,7 +196,6 @@ const TaskResponse = () => {
   };
 
   const handleForward = () => {
-    // Forward task to selected users (forwardUsers state)
     fetch(`http://localhost:3000/api/tasks/${task.id}/forward`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -179,7 +214,6 @@ const TaskResponse = () => {
   };
 
   const handleBackward = () => {
-    // Send task back to sender with a backward reason
     fetch(`http://localhost:3000/api/tasks/${task.id}/backward`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -202,6 +236,14 @@ const TaskResponse = () => {
       <Header />
       <div className="container mx-auto p-6 space-y-6">
         <h1 className="text-3xl font-bold">{task.title}</h1>
+        {hasResponded && userResponse && (
+          <div className="bg-green-50 border p-4 rounded-lg mb-4">
+            <p className="text-green-800">You have already responded to this task.</p>
+            <p className="text-sm text-gray-600">
+              Your response: {userResponse.status} – {userResponse.reason}
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div className="bg-white rounded-lg border p-6">
@@ -306,6 +348,7 @@ const TaskResponse = () => {
                 <button
                   onClick={handleApprove}
                   className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors"
+                  disabled={hasResponded}
                 >
                   Approve Task
                 </button>
@@ -320,6 +363,7 @@ const TaskResponse = () => {
                   <button
                     type="submit"
                     className="w-full bg-primary text-white py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                    disabled={hasResponded}
                   >
                     Upload Attachments
                   </button>
@@ -332,10 +376,12 @@ const TaskResponse = () => {
                     placeholder="Add a comment..."
                     rows={4}
                     required
+                    disabled={hasResponded}
                   />
                   <button
                     type="submit"
                     className="w-full bg-primary text-white py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                    disabled={hasResponded}
                   >
                     Add Comment
                   </button>

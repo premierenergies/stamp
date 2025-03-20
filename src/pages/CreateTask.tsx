@@ -1,3 +1,4 @@
+// CreateTask.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -5,20 +6,7 @@ import { toast } from "sonner";
 import Header from "@/components/Header";
 import { Checkbox } from "@/components/ui/checkbox";
 
-interface User {
-  id: string;
-  username: string;
-  name: string;
-  role: string;
-}
-
-const userList = [
-  { id: "s", name: "Sales Team Member" },
-  { id: "p", name: "Praful" },
-  { id: "c", name: "Common User" },
-];
-
-// Helper to convert fake paths to absolute URL
+// Helper to convert fake paths to absolute URLs
 const getDocumentUrl = (docPath: string): string => {
   if (!docPath) return "";
   if (docPath.startsWith("C:\\fakepath\\")) {
@@ -34,6 +22,19 @@ const getDocumentUrl = (docPath: string): string => {
   return docPath;
 };
 
+interface User {
+  id: string;
+  username: string;
+  name: string;
+  role: string;
+}
+
+const userList = [
+  { id: "s", name: "Sales Team Member" },
+  { id: "p", name: "Praful" },
+  { id: "c", name: "Common User" },
+];
+
 const CreateTask = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -42,12 +43,19 @@ const CreateTask = () => {
   const [customer, setCustomer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<FileList | null>(null);
+
+  // Restrict task creation: allow only "common" and "manager" roles.
+  useEffect(() => {
+    if (user && user.role === "sales") {
+      toast.error("You are not authorized to create tasks.");
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     const fetchProjectAndCustomer = async () => {
@@ -140,7 +148,6 @@ const CreateTask = () => {
         {/* Read-only Project Details Section */}
         <div className="bg-gray-50 p-6 rounded-lg border space-y-4">
           <h2 className="text-xl font-semibold">Project Details (Read-only)</h2>
-          {/* Basic Project Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Customer</label>
@@ -179,7 +186,6 @@ const CreateTask = () => {
               />
             </div>
           </div>
-          {/* Additional Project Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Project Details</label>

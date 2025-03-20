@@ -1,3 +1,4 @@
+// server.cjs
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -10,6 +11,7 @@ const { ClientSecretCredential } = require("@azure/identity");
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Serve static files from the absolute uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 mongoose
@@ -25,9 +27,10 @@ mongoose
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
+// Use an absolute path for the destination folder
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/");
+    cb(null, path.join(__dirname, "uploads"));
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -217,8 +220,6 @@ async function createActivityLog(action, userId, details) {
 // ----------------------
 // Endpoints
 // ----------------------
-
-// POST /api/login
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   const user = USERS.find((u) => u.email === email && u.password === password);
@@ -226,17 +227,16 @@ app.post("/api/login", (req, res) => {
   return res.json({ id: user.id, username: user.username, name: user.name, email: user.email, role: user.role });
 });
 
-// GET /api/users
 app.get("/api/users", (req, res) => {
   const usersWithoutPasswords = USERS.map(({ password, ...rest }) => rest);
   res.json(usersWithoutPasswords);
 });
 
-// GET /api/documents
 app.get("/api/documents", async (req, res) => {
   try {
     let query = {};
     if (req.query.uploadedBy) query.uploadedBy = req.query.uploadedBy;
+    if (req.query.projectTitle) query.projectTitle = req.query.projectTitle; // filter by projectTitle
     const docs = await Document.find(query);
     res.json(
       docs.map((d) => ({
@@ -257,7 +257,6 @@ app.get("/api/documents", async (req, res) => {
   }
 });
 
-// PUT /api/documents/:docId – update document (Sales editing)
 app.put("/api/documents/:docId", upload.single("file"), async (req, res) => {
   try {
     const { docId } = req.params;
@@ -288,7 +287,6 @@ app.put("/api/documents/:docId", upload.single("file"), async (req, res) => {
   }
 });
 
-// POST /api/documents – create document (Sales submission)
 app.post("/api/documents", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -320,11 +318,14 @@ app.post("/api/documents", upload.single("file"), async (req, res) => {
   }
 });
 
-// POST /api/projects – create project (new endpoint)
-app.post("/api/projects", async (req, res) => {
+// -----------------
+// Modified POST /api/projects endpoint using upload.any() to handle file uploads and create Document entries
+app.post("/api/projects", upload.any(), async (req, res) => {
   try {
+    // Generate a project id if not provided
+    const projectId = req.body.id || Math.random().toString(36).substr(2, 9);
+    
     const {
-      id,
       customerId,
       customerName,
       name,
@@ -337,20 +338,45 @@ app.post("/api/projects", async (req, res) => {
       progress,
       tasks,
       inlineInspection,
-      technicalSpecsDoc,
       qapCriteria,
-      qapDocument,
-      tenderDocument,
       productType,
       plant,
-      otherDocuments,
       uploadedAt,
       createdBy,
     } = req.body;
-    const customer = await Customer.findById(customerId);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    
+    // Process file uploads from the FormData
+    let technicalSpecsDoc = "";
+    let qapDocument = "";
+    let tenderDocument = "";
+    let otherDocuments = [];
+    
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        if (file.fieldname === "technicalSpecsDoc") {
+          technicalSpecsDoc = "/uploads/" + file.filename;
+        } else if (file.fieldname === "qapDocument") {
+          qapDocument = "/uploads/" + file.filename;
+        } else if (file.fieldname === "tenderDocument") {
+          tenderDocument = "/uploads/" + file.filename;
+        } else if (file.fieldname === "otherDocuments") {
+          otherDocuments.push("/uploads/" + file.filename);
+        }
+      });
+    }
+    
+    // Parse tasks if provided (it might be a JSON string)
+    let parsedTasks = { total: 0, completed: 0, pending: 0, stuck: 0 };
+    if (tasks) {
+      try {
+        parsedTasks = JSON.parse(tasks);
+      } catch (e) {
+        parsedTasks = { total: 0, completed: 0, pending: 0, stuck: 0 };
+      }
+    }
+    
     const newProject = {
-      id,
+      id: projectId,
       customerId,
       customerName,
       name,
@@ -358,13 +384,13 @@ app.post("/api/projects", async (req, res) => {
       status,
       startDate,
       endDate,
-      budget,
+      budget: budget ? Number(budget) : 0,
       priority,
-      progress,
-      tasks,
-      inlineInspection,
+      progress: progress ? Number(progress) : 0,
+      tasks: parsedTasks,
+      inlineInspection: inlineInspection === "yes",
       technicalSpecsDoc,
-      qapCriteria,
+      qapCriteria: qapCriteria === "yes",
       qapDocument,
       tenderDocument,
       productType,
@@ -372,9 +398,61 @@ app.post("/api/projects", async (req, res) => {
       otherDocuments,
       uploadedAt,
     };
+    
+    const customer = await Customer.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
     customer.projects.push(newProject);
     await customer.save();
     await createActivityLog("Project Creation", createdBy || "unknown", `Project ${newProject.name} created for customer ${customer.name}.`);
+
+    // Create Document entries for each uploaded file so that they are visible to managers.
+    if (technicalSpecsDoc) {
+      await Document.create({
+        name: "Technical Specifications Document",
+        url: technicalSpecsDoc,
+        uploadedBy: createdBy,
+        customerName: customerName,
+        projectTitle: name,
+        projectDetails: description,
+        expectedDeliverySchedule: null,
+      });
+    }
+    if (qapDocument) {
+      await Document.create({
+        name: "QAP Document",
+        url: qapDocument,
+        uploadedBy: createdBy,
+        customerName: customerName,
+        projectTitle: name,
+        projectDetails: description,
+        expectedDeliverySchedule: null,
+      });
+    }
+    if (tenderDocument) {
+      await Document.create({
+        name: "Tender Document",
+        url: tenderDocument,
+        uploadedBy: createdBy,
+        customerName: customerName,
+        projectTitle: name,
+        projectDetails: description,
+        expectedDeliverySchedule: null,
+      });
+    }
+    if (otherDocuments && otherDocuments.length > 0) {
+      for (const docUrl of otherDocuments) {
+        await Document.create({
+          name: "Other Document",
+          url: docUrl,
+          uploadedBy: createdBy,
+          customerName: customerName,
+          projectTitle: name,
+          projectDetails: description,
+          expectedDeliverySchedule: null,
+        });
+      }
+    }
+    
     res.status(201).json({ project: newProject });
   } catch (error) {
     console.error("Error creating project:", error);
@@ -382,7 +460,6 @@ app.post("/api/projects", async (req, res) => {
   }
 });
 
-// GET /api/projects/:projectId – fetch a single project by ID from within the customer's projects array
 app.get("/api/projects/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -397,7 +474,6 @@ app.get("/api/projects/:projectId", async (req, res) => {
   }
 });
 
-// GET /api/tasks – retrieve tasks; if query.projectId is provided, filter by that; if query.userId is provided, filter by assigned users
 app.get("/api/tasks", async (req, res) => {
   try {
     let query = {};
@@ -423,7 +499,6 @@ app.get("/api/tasks", async (req, res) => {
   }
 });
 
-// GET /api/tasks/:taskId – fetch a single task by its ID
 app.get("/api/tasks/:taskId", async (req, res) => {
   try {
     const task = await Task.findById(req.params.taskId);
@@ -438,7 +513,6 @@ app.get("/api/tasks/:taskId", async (req, res) => {
   }
 });
 
-// POST /api/tasks – create task (new endpoint for project tasks)
 app.post("/api/tasks", upload.array("files"), async (req, res) => {
   try {
     const { projectId, projectName, title, description, assignedUsers, createdBy, dueDate } = req.body;
@@ -449,7 +523,6 @@ app.post("/api/tasks", upload.array("files"), async (req, res) => {
     } catch (e) {
       parsedAssignedUsers = [];
     }
-    // Retrieve the project details from the customer
     const customer = await Customer.findOne({ "projects.id": projectId });
     if (!customer) return res.status(404).json({ message: "Customer for the project not found" });
     const project = customer.projects.find(p => p.id === projectId);
@@ -478,7 +551,6 @@ app.post("/api/tasks", upload.array("files"), async (req, res) => {
   }
 });
 
-// PUT /api/tasks/:taskId – update task (reroute/edit)
 app.put("/api/tasks/:taskId", upload.array("files"), async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -488,7 +560,7 @@ app.put("/api/tasks/:taskId", upload.array("files"), async (req, res) => {
       title,
       description,
       dueDate,
-      assignedUsers: JSON.parse(assignedUsers),
+      assignedUsers: JSON.parse(req.body.assignedUsers),
     };
     if (files && files.length > 0) {
       updateData.attachments = files.map((file) => ({ name: file.originalname, url: "/uploads/" + file.filename }));
@@ -502,7 +574,6 @@ app.put("/api/tasks/:taskId", upload.array("files"), async (req, res) => {
   }
 });
 
-// PUT /api/tasks/:taskId/respond – respond to task
 app.put("/api/tasks/:taskId/respond", responseUpload.single("file"), async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -532,7 +603,6 @@ app.put("/api/tasks/:taskId/respond", responseUpload.single("file"), async (req,
         timestamp: new Date(),
       });
     }
-    // Check all assigned responses
     const responsesMap = {};
     taskDoc.responses.forEach(r => { responsesMap[r.userId] = r.status; });
     const stuckWith = taskDoc.assignedUsers.filter(u => responsesMap[u] !== "approved");
@@ -552,17 +622,18 @@ app.put("/api/tasks/:taskId/respond", responseUpload.single("file"), async (req,
   }
 });
 
-// POST /api/tasks/:taskId/forward – forward task to additional users
 app.post("/api/tasks/:taskId/forward", async (req, res) => {
   try {
     const { taskId } = req.params;
-    const { newAssignedUsers } = req.body; // expected to be an array of user IDs
+    const { newAssignedUsers, comment } = req.body;
     const taskDoc = await Task.findById(taskId);
     if (!taskDoc) return res.status(404).json({ message: "Task not found" });
-    // Add new users ensuring uniqueness
     const updatedUsers = Array.from(new Set([...taskDoc.assignedUsers, ...newAssignedUsers]));
     taskDoc.assignedUsers = updatedUsers;
-    await createActivityLog("Task Forwarded", req.body.forwardedBy || "unknown", `Task ${taskId} forwarded to: ${newAssignedUsers.join(", ")}`);
+    const logMessage = comment 
+      ? `Task ${taskId} forwarded to: ${newAssignedUsers.join(", ")}. Comment: ${comment}`
+      : `Task ${taskId} forwarded to: ${newAssignedUsers.join(", ")}`;
+    await createActivityLog("Task Forwarded", req.body.forwardedBy || "unknown", logMessage);
     await taskDoc.save();
     res.json({ task: taskDoc });
   } catch (error) {
@@ -571,14 +642,12 @@ app.post("/api/tasks/:taskId/forward", async (req, res) => {
   }
 });
 
-// POST /api/tasks/:taskId/backward – send task back to sender
 app.post("/api/tasks/:taskId/backward", async (req, res) => {
   try {
     const { taskId } = req.params;
     const { reason } = req.body;
     const taskDoc = await Task.findById(taskId);
     if (!taskDoc) return res.status(404).json({ message: "Task not found" });
-    // Set status to backward and assign task back to the creator
     taskDoc.status = "backward";
     taskDoc.assignedUsers = [taskDoc.createdBy];
     await createActivityLog("Task Sent Back", req.body.sentBy || "unknown", `Task ${taskId} sent back to sender. Reason: ${reason}`);
@@ -590,7 +659,6 @@ app.post("/api/tasks/:taskId/backward", async (req, res) => {
   }
 });
 
-// POST /api/tasks/:taskId/remind – send reminder email for pending task
 app.post("/api/tasks/:taskId/remind", async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -600,6 +668,17 @@ app.post("/api/tasks/:taskId/remind", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error sending reminder" });
+  }
+});
+
+app.get("/api/tasks/:taskId/activity", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const logs = await ActivityLog.find({ details: new RegExp(taskId) }).sort({ timestamp: 1 });
+    res.json(logs);
+  } catch (error) {
+    console.error("Error fetching activity logs:", error);
+    res.status(500).json({ message: "Error fetching activity logs" });
   }
 });
 
@@ -628,6 +707,28 @@ async function sendOutlookNotification(recipients, subject, content) {
     console.error("Error sending Outlook email:", err);
   }
 }
+
+app.get("/api/activity/customer/:customerId", async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const logs = await ActivityLog.find({ details: new RegExp(customerId, "i") }).sort({ timestamp: 1 });
+    res.json(logs);
+  } catch (error) {
+    console.error("Error fetching customer activity logs:", error);
+    res.status(500).json({ message: "Error fetching customer activity logs" });
+  }
+});
+
+app.get("/api/activity/project/:projectId", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const logs = await ActivityLog.find({ details: new RegExp(projectId, "i") }).sort({ timestamp: 1 });
+    res.json(logs);
+  } catch (error) {
+    console.error("Error fetching project activity logs:", error);
+    res.status(500).json({ message: "Error fetching project activity logs" });
+  }
+});
 
 const PORT = 3000;
 app.listen(PORT, () => {

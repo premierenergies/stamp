@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { LogOut, ChevronLeft, LayoutDashboard, FileText } from "lucide-react";
+import { LogOut, ChevronLeft, LayoutDashboard } from "lucide-react";
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -32,15 +32,7 @@ const Header = () => {
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
               </button>
-              {user?.role === "manager" && (
-                <button
-                  onClick={() => navigate("/task-journey")}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <FileText className="w-4 h-4" />
-                  Task Journey
-                </button>
-              )}
+              {/* Task Journey is now task specific – removed global link */}
             </nav>
           </div>
           <div className="flex items-center gap-4">
