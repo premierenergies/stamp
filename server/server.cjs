@@ -11,6 +11,7 @@ const { ClientSecretCredential } = require("@azure/identity");
 const app = express();
 app.use(cors());
 app.use(express.json());
+
 // Serve static files from the absolute uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -71,9 +72,7 @@ const USERS = [
   { id: 7, username: "e", password: "e", role: "common", name: "Common User 5" },
 ];
 
-// ----------------------
 // Customer Schema – industry is now optional
-// ----------------------
 const customerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   industry: { type: String, required: false },
@@ -149,9 +148,7 @@ app.post("/api/customers", async (req, res) => {
   }
 });
 
-// ----------------------
 // Document Schema
-// ----------------------
 const documentSchema = new mongoose.Schema({
   name: String,
   url: String,
@@ -164,9 +161,7 @@ const documentSchema = new mongoose.Schema({
 });
 const Document = mongoose.model("Document", documentSchema);
 
-// ----------------------
 // Task Response Schema
-// ----------------------
 const taskResponseSchema = new mongoose.Schema({
   userId: String,
   userName: String,
@@ -177,9 +172,7 @@ const taskResponseSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
-// ----------------------
-// Task Schema – updated for project tasks with projectDetails field and stuckWith field
-// ----------------------
+// Task Schema 
 const taskSchema = new mongoose.Schema({
   projectId: { type: String, required: true },
   projectName: { type: String, required: true },
@@ -203,9 +196,7 @@ const taskSchema = new mongoose.Schema({
 });
 const Task = mongoose.model("Task", taskSchema);
 
-// ----------------------
 // Activity Log Schema
-// ----------------------
 const activityLogSchema = new mongoose.Schema({
   action: String,
   userId: String,
@@ -217,9 +208,7 @@ async function createActivityLog(action, userId, details) {
   await ActivityLog.create({ action, userId, details });
 }
 
-// ----------------------
 // Endpoints
-// ----------------------
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   const user = USERS.find((u) => u.email === email && u.password === password);
@@ -318,7 +307,6 @@ app.post("/api/documents", upload.single("file"), async (req, res) => {
   }
 });
 
-// -----------------
 // Modified POST /api/projects endpoint using upload.any() to handle file uploads and create Document entries
 app.post("/api/projects", upload.any(), async (req, res) => {
   try {
